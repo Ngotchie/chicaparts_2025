@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Thème appliqué au démarrage -->
+    <style name="LaunchTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:statusBarColor">@color/primary_splash</item>
+    </style>
+
+    <!-- Thème principal de l'application -->
+    <style name="NormalTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+        <item name="android:statusBarColor">@color/primary_splash</item>
+    </style>
+</resources>
