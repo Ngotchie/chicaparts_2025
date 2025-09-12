@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "chicaparts_partner",
-      "version": "1.0.1+9",
+      "version": "1.0.2+1",
       "dependencies": [
         "cached_network_image",
         "carousel_slider",
