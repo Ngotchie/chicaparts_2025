@@ -6,6 +6,14 @@ scripts:
       flutter pub get
       rm -rf ios/Pods ios/Podfile.lock ios/Runner.xcworkspace
       cd ios && pod repo update && pod install --verbose && cd ..
+
+  - name: Compute iOS build number
+    script: |
+      BASE=${BUILD_NUMBER:-1}
+      IOS_BUILD=$((BASE + 1))   # augmente par rapport au précédent
+      echo "Using iOS build number: $IOS_BUILD"
+      echo "export IOS_BUILD_NUMBER=$IOS_BUILD" >> $CM_ENV
+
   - name: Build iOS (IPA)
     script: |
-      flutter build ipa --release --build-number=${BUILD_NUMBER:-1}
+      flutter build ipa --release --build-number=$IOS_BUILD_NUMBER
