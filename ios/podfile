@@ -1,13 +1,17 @@
-platform :ios, '14.0'  # ⬅️ important
+# ios/Podfile
 
+platform :ios, '14.0'             # iOS min 14.0 (exigé par plusieurs plugins récents)
+inhibit_all_warnings!             # optionnel : cache les warnings pods
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Indique à CocoaPods le projet Xcode à intégrer
 project 'Runner', {
-  'Debug' => :debug,
+  'Debug'   => :debug,
   'Profile' => :release,
   'Release' => :release,
 }
 
+# Récupère le chemin Flutter depuis ios/Flutter/Generated.xcconfig
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
@@ -22,21 +26,31 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+# Prépare le contexte CocoaPods pour Flutter
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  # Requis par de nombreux plugins (Stripe, Google Maps, etc.)
   use_frameworks! :linkage => :static
   use_modular_headers!
 
+  # 🔧 Patch : forcer PhoneNumberKit en 3.x (API 'PhoneNumberKit' utilisée par libphonenumber_plugin)
+  pod 'PhoneNumberKit', '~> 3.8'
+
+  # Installe tous les pods déclarés par les plugins Flutter
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
+# Hooks de post-installation
 post_install do |installer|
+  # Force l’iOS min à 14.0 pour tous les targets (Runner + Pods)
   installer.pods_project.targets.each do |target|
-    # Force tous les targets (Pods + Runner) à iOS 14.0
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      # Optionnel : assure une version Swift raisonnable si nécessaire
+      # config.build_settings['SWIFT_VERSION'] = '5.0'
     end
+    # Réglages additionnels Flutter (bitcode, etc.)
     flutter_additional_ios_build_settings(target)
   end
 end
