@@ -1,0 +1,11 @@
+scripts:
+  - name: Flutter deps
+    script: |
+      flutter --version
+      flutter clean
+      flutter pub get
+      rm -rf ios/Pods ios/Podfile.lock ios/Runner.xcworkspace
+      cd ios && pod repo update && pod install --verbose && cd ..
+  - name: Build iOS (IPA)
+    script: |
+      flutter build ipa --release --build-number=${BUILD_NUMBER:-1}
