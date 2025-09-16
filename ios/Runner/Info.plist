@@ -45,6 +45,24 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Caméra -->
+	<key>NSCameraUsageDescription</key>
+	<string>Nous utilisons la caméra pour scanner des cartes de paiement et/ou prendre des photos nécessaires à l’app.</string>
+
+	<!-- Localisation "quand l’app est utilisée" (cartes/adresses/proximité) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Votre position nous permet d’afficher la carte, trouver des adresses et proposer des résultats à proximité.</string>
+
+	<!-- (Optionnel) Accès photothèque si l’utilisateur choisit une image -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Nous avons besoin d’accéder à votre photothèque pour sélectionner des images.</string>
+
+	<!-- (Optionnel) Écriture dans la photothèque si tu enregistres des images -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Nous avons besoin d’enregistrer des images dans votre photothèque.</string>
+
+	<!-- Corrige App Transport Security : NSAllowsArbitraryLoads doit être dans ce dictionnaire -->
+	<key>NSAppTransportSecurity</key>
 	<key>NSAllowsArbitraryLoads</key>
     <true/>
 </dict>
