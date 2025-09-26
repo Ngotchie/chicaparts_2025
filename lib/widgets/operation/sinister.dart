@@ -118,7 +118,7 @@ class _SinisterWidgetState extends State<SinisterWidget> {
               ),
             ),
             FutureBuilder(
-                future: getSinisters(widget.user.thirdParty["id"], filter),
+                future: getSinisters(widget.user.id, filter),
                 builder: (context, AsyncSnapshot snap) {
                   List<String> accommodations = [];
                   if (snap.data == null ||

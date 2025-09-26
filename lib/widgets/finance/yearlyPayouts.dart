@@ -141,8 +141,7 @@ class _YearlyPayoutWidgetState extends State<YearlyPayoutWidget> {
                   ),
                 ),
                 FutureBuilder(
-                    future:
-                        getYearlyPayouts(widget.user.thirdParty["id"], filter),
+                    future: getYearlyPayouts(widget.user.id, filter),
                     builder: (context, AsyncSnapshot snap) {
                       List<String> accommodations = [];
                       List<String> years = [];

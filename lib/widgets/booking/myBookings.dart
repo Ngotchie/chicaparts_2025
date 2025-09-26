@@ -19,8 +19,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
   final methods = Methods();
   final apiBooking = ApiBooking();
   Future<List<Booking>> getBooking(range) {
-    return apiBooking.getBookings(
-        widget.user.thirdParty["id"], range, 'partner');
+    return apiBooking.getBookings(widget.user.id, range, 'partner');
   }
 
   final String _range = "a => b";
@@ -43,7 +42,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                         WidgetStateProperty.all<Color>(const Color(0xFF244B6B)),
                   ),
                   onPressed: () {
-                    addBlockDate(context, widget.user.thirdParty["id"]);
+                    addBlockDate(context, widget.user.id);
                   },
                   child: const Text(
                     ' + Block Dates ',
@@ -62,8 +61,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                         WidgetStateProperty.all<Color>(const Color(0xFF244B6B)),
                   ),
                   onPressed: () {
-                    addBooking(
-                        context, "", widget.user.thirdParty["id"], false);
+                    addBooking(context, "", widget.user.id, false);
                   },
                   child: const Text(
                     ' + Add Booking ',
@@ -130,11 +128,11 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                                   context,
                                                   snapshot.data[i],
                                                   1,
-                                                  widget.user.thirdParty["id"])
+                                                  widget.user.id)
                                               : showAllBooking(
                                                   context,
                                                   snapshot.data[i],
-                                                  widget.user.thirdParty["id"]);
+                                                  widget.user.id);
                                         },
                                         child: Container(
                                           height: 155,
@@ -309,8 +307,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                           Column(
                             children: [
                               FutureBuilder(
-                                  future: getProperties(
-                                      widget.user.thirdParty["id"]),
+                                  future: getProperties(widget.user.id),
                                   builder: (context, AsyncSnapshot snap) {
                                     if (snap.data == null) {
                                       return Container(
@@ -818,7 +815,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           FutureBuilder(
-                              future: getData(widget.user.thirdParty["id"]),
+                              future: getData(widget.user.id),
                               builder: (context, AsyncSnapshot snap) {
                                 if (snap.data == null) {
                                   return Container(

@@ -46,7 +46,6 @@ class WelcomePage extends StatefulWidget {
 class _WelcomePageState extends State<WelcomePage> {
   int _currentIndex = 0;
   String _currentLocale = 'en'; // Langue par défaut
-
   final List<String> imageList = [
     "assets/images/background-signup.jpg",
     "assets/images/terrasse.png",
@@ -57,7 +56,6 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   Widget build(BuildContext context) {
     var localization = AppLocalizations(_currentLocale);
-
     return Scaffold(
       body: SafeArea(
         child: Stack(

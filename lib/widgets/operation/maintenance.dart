@@ -124,8 +124,7 @@ class _MaintenanceWidgetState extends State<MaintenanceWidget> {
                 ),
               ),
               FutureBuilder(
-                  future: getMaintenances(
-                      widget.user.thirdParty["id"], pending, natureValue),
+                  future: getMaintenances(widget.user.id, pending, natureValue),
                   builder: (context, AsyncSnapshot snap) {
                     List<String> accommodations = [];
 

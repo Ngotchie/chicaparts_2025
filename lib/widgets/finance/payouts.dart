@@ -91,7 +91,7 @@ class _PayoutWidgetState extends State<PayoutWidget> {
                     ),
                   ),
                   FutureBuilder(
-                      future: getPayouts(widget.user.thirdParty["id"], filter),
+                      future: getPayouts(widget.user.id, filter),
                       builder: (context, AsyncSnapshot snap) {
                         List<String> accommodations = [];
                         if (snap.data == null) {

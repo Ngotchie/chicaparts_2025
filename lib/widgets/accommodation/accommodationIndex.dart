@@ -41,7 +41,7 @@ class _AccommodationIndexWidgetState extends State<AccommodationIndexWidget> {
           color: Colors.white,
           child: Column(children: <Widget>[
             FutureBuilder(
-                future: callApiListAcc(widget.user.thirdParty["id"]),
+                future: callApiListAcc(widget.user.id),
                 builder: (BuildContext context, AsyncSnapshot snapshot) {
                   if (snapshot.data == null) {
                     return Container(
@@ -84,8 +84,7 @@ class _AccommodationIndexWidgetState extends State<AccommodationIndexWidget> {
                                                     color: Colors.grey,
                                                     width: 0.5),
                                                 borderRadius: const BorderRadius
-                                                        .all(
-                                                    Radius.circular(
+                                                    .all(Radius.circular(
                                                         5.0) //         <--- border radius here
                                                     ),
                                               ),

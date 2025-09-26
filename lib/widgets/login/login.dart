@@ -23,10 +23,10 @@ class LoginPageState extends State<LoginPage> {
   bool isEnglish = true;
   bool isLoading = false;
   final _formKey = GlobalKey<FormState>();
-  bool isTraveler = false;
-  // Controllers pour les champs de texte
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
+
+  // Controllers
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
   bool isPasswordVisible = false;
 
@@ -38,26 +38,24 @@ class LoginPageState extends State<LoginPage> {
         width: MediaQuery.of(context).size.width,
         child: Stack(
           children: [
-            // Arrière-plan avec image en diagonale
+            // BG image diagonale
             Positioned.fill(
               child: Transform.rotate(
-                angle:
-                    -0.6, // En radians, -0.4 ≈ -23 degrés (ajuste selon ton besoin)
+                angle: -0.6,
                 child: Opacity(
-                  opacity:
-                      0.5, // ✅ Faible opacité pour éviter que ce soit trop agressif
+                  opacity: 0.5,
                   child: Image.asset(
                     "assets/images/logo-chic.png",
-                    // fit: BoxFit.cover, // ✅ Prend toute la page
                     alignment: Alignment.center,
                   ),
                 ),
               ),
             ),
-            // Overlay sombre pour améliorer la lisibilité
+            // Overlay sombre
             Positioned.fill(
               child: IgnorePointer(
-                  child: Container(color: Colors.black.withOpacity(0.5))),
+                child: Container(color: Colors.black.withOpacity(0.5)),
+              ),
             ),
 
             SafeArea(
@@ -70,7 +68,6 @@ class LoginPageState extends State<LoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 120),
-                      // Titre
                       Text(
                         isEnglish ? "Welcome Back!" : "Bon retour !",
                         style: const TextStyle(
@@ -81,7 +78,7 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Champ Email avec validation
+                      // Email
                       buildTextField(
                         controller: emailController,
                         hintText: "Email",
@@ -105,7 +102,7 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Champ Mot de passe avec affichage/masquage
+                      // Password
                       buildTextField(
                         controller: passwordController,
                         hintText: isEnglish ? "Password" : "Mot de passe",
@@ -127,7 +124,7 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Bouton Se connecter
+                      // Bouton Login
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -141,9 +138,12 @@ class LoginPageState extends State<LoginPage> {
                           onPressed: () async {
                             if (_formKey.currentState!.validate()) {
                               setState(() => isLoading = true);
-                              await _authentification(emailController.text,
-                                  passwordController.text, context);
-                              setState(() => isLoading = false);
+                              await _authenticate(
+                                emailController.text.trim(),
+                                passwordController.text,
+                                context,
+                              );
+                              if (mounted) setState(() => isLoading = false);
                             }
                           },
                           child: isLoading
@@ -158,7 +158,7 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Lien vers "Mot de passe oublié"
+                      // Forgot password
                       Center(
                         child: GestureDetector(
                           onTap: () {
@@ -183,7 +183,7 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 15),
 
-                      // Lien vers inscription avec animation
+                      // Sign up
                       Center(
                         child: GestureDetector(
                           onTap: () {
@@ -191,7 +191,8 @@ class LoginPageState extends State<LoginPage> {
                               PageRouteBuilder(
                                 transitionDuration:
                                     const Duration(milliseconds: 500),
-                                pageBuilder: (_, __, ___) => AccountPage(),
+                                pageBuilder: (_, __, ___) =>
+                                    const AccountPage(),
                                 transitionsBuilder: (_, animation, __, child) {
                                   return FadeTransition(
                                     opacity: animation,
@@ -217,6 +218,7 @@ class LoginPageState extends State<LoginPage> {
               ),
             ),
 
+            // AppBar custom
             Positioned(
               top: 40,
               left: 20,
@@ -224,19 +226,16 @@ class LoginPageState extends State<LoginPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Bouton retour
                   IconButton(
                     icon: const Icon(Icons.arrow_back,
                         color: Colors.white, size: 28),
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => WelcomePage()),
+                        MaterialPageRoute(builder: (_) => const WelcomePage()),
                       );
                     },
                   ),
-
-                  // Bouton changement de langue
                   TextButton.icon(
                     onPressed: () {
                       setState(() {
@@ -258,7 +257,7 @@ class LoginPageState extends State<LoginPage> {
     );
   }
 
-  // Widget pour un champ de texte avec validation
+  // TextField avec validation live + toggle "voir/cacher" pour les mots de passe
   Widget buildTextField({
     required TextEditingController controller,
     required String hintText,
@@ -267,6 +266,7 @@ class LoginPageState extends State<LoginPage> {
     String? Function(String?)? validator,
   }) {
     String? errorText;
+    bool _obscure = isPassword; // état local du champ (visible/masqué)
 
     return StatefulBuilder(
       builder: (context, setFieldState) {
@@ -287,14 +287,16 @@ class LoginPageState extends State<LoginPage> {
               ),
               child: TextField(
                 controller: controller,
-                obscureText: isPassword,
+                obscureText: _obscure,
+                obscuringCharacter: '•',
+                keyboardType: isPassword
+                    ? TextInputType.text
+                    : TextInputType.emailAddress,
                 style: const TextStyle(color: Colors.white),
                 onChanged: (value) {
                   if (validator != null) {
                     final validation = validator(value);
-                    setFieldState(() {
-                      errorText = validation;
-                    });
+                    setFieldState(() => errorText = validation);
                   }
                 },
                 decoration: InputDecoration(
@@ -302,7 +304,30 @@ class LoginPageState extends State<LoginPage> {
                   hintText: hintText,
                   hintStyle: const TextStyle(color: Colors.white70),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 0),
+
+                  // 👇 Bouton afficher/masquer pour les champs password
+                  suffixIcon: isPassword
+                      ? GestureDetector(
+                          onTap: () =>
+                              setFieldState(() => _obscure = !_obscure),
+                          // Appui long = "peek": montre tant que pressé
+                          onLongPressStart: (_) =>
+                              setFieldState(() => _obscure = false),
+                          onLongPressEnd: (_) =>
+                              setFieldState(() => _obscure = true),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Icon(
+                              _obscure
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
             ),
@@ -320,151 +345,182 @@ class LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<User> _getUserData(email, pass) async {
-    ApiUrl url = ApiUrl();
-    String apiUrl = url.getApiUrl();
-    String apiKey = url.getKey();
-    var client = RetryClient(http.Client());
-    User user = User(0, "", "", []);
+  /// ---------------------------
+  ///  API CALLS + NORMALISATION
+  /// ---------------------------
 
+  /// Login PARTENAIRE (Season)
+  Future<User?> _loginPartner(String email, String pass) async {
+    final url = ApiUrl();
+    final apiUrl = url.getApiUrl(); // ex: https://season.api/...
+    final apiKey = url.getKey();
+
+    final client = RetryClient(http.Client());
     try {
-      var data = await client.post(Uri.parse('${apiUrl}auth/login'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-Authorization': apiKey,
-          },
-          body: jsonEncode(<String, String>{'email': email, 'password': pass}));
-      if (data.statusCode == 200) {
-        isTraveler = false;
-        var jsonData = jsonDecode(data.body);
-        user = User(jsonData["id"], jsonData["name"], jsonData["email"],
-            jsonData["third_party"]);
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        prefs.setString('user', data.body);
-        prefs.setString('email', jsonData["email"]);
+      final resp = await client.post(
+        Uri.parse('${apiUrl}auth/login'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Authorization': apiKey,
+        },
+        body: jsonEncode(<String, String>{
+          'email': email,
+          'password': pass,
+        }),
+      );
 
-        // await FavoriteRepository.syncLocalFavoritesToServer(user);
+      if (resp.statusCode != 200) return null;
 
-        return user;
-      } else {
-        return user;
-      }
+      // Réponse Season (partner) — très verbeuse
+      final Map<String, dynamic> jsonData = jsonDecode(resp.body);
+
+      // 🔵 Normalisation → User léger de l’app
+      final user = User(
+        jsonData["id"] ?? 0,
+        (jsonData["name"] ?? '').toString(),
+        (jsonData["email"] ?? '').toString(),
+        "partner", // ✅ clé unifiée
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      // Sauvegarde NORMALISÉE
+      await prefs.setString('user', jsonEncode(user.toJson()));
+      await prefs.setString('email', user.email);
+
+      // (Optionnel) Historiser le RAW si besoin de permissions/roles plus tard
+      await prefs.setString('user_raw_partner', resp.body);
+
+      await prefs.setString('app_lang', isEnglish ? 'en' : 'fr');
+      // await FavoriteRepository.syncLocalFavoritesToServer(user);
+      return user;
     } catch (e) {
+      debugPrint('Partner login error: $e');
+      return null;
+    } finally {
       client.close();
-      print(e);
-      return throw Exception(e);
     }
   }
 
-  Future<User> _getTravelerData(email, pass) async {
-    ApiUrl url = ApiUrl();
-    String apiUrl = url.getChicapartsUrl();
-    String apiKey = url.getKey();
-    var client = RetryClient(http.Client());
-    User user = User(0, "", "", []);
+  /// Login VOYAGEUR (Chicaparts)
+  Future<User?> _loginTraveler(String email, String pass) async {
+    final url = ApiUrl();
+    final apiUrl = url.getChicapartsUrl(); // ex: https://chicaparts.api/...
+    final apiKey = url.getKey();
 
+    final client = RetryClient(http.Client());
     try {
-      var data = await client.post(Uri.parse('${apiUrl}auth/login'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-Authorization': apiKey,
-          },
-          body: jsonEncode(<String, String>{'login': email, 'password': pass}));
-      if (data.statusCode == 200) {
-        isTraveler = true;
-        var jsonData = jsonDecode(data.body);
-        user = User(jsonData["user"]["id"], jsonData["user"]["first_name"],
-            jsonData["user"]["email"], "traveler");
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        prefs.setString('user', jsonEncode(user.toJson()));
-        prefs.setString('email', jsonData["user"]["email"]);
-        return user;
-      } else {
-        return user;
-      }
+      final resp = await client.post(
+        Uri.parse('${apiUrl}auth/login'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Authorization': apiKey,
+        },
+        body: jsonEncode(<String, String>{
+          'login': email,
+          'password': pass,
+        }),
+      );
+
+      if (resp.statusCode != 200) return null;
+
+      // Réponse Chicaparts (traveler)
+      final Map<String, dynamic> jsonData = jsonDecode(resp.body);
+      final u = jsonData["user"] as Map<String, dynamic>?;
+
+      final user = User(
+        (u?["id"] ?? 0) as int,
+        (u?["first_name"] ?? u?["name"] ?? '').toString(),
+        (u?["email"] ?? '').toString(),
+        "traveler", // ✅ clé unifiée
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(user.toJson())); // normalisé
+      await prefs.setString('email', user.email);
+
+      await prefs.setString('user_raw_traveler', resp.body); // optionnel
+
+      await prefs.setString('app_lang', isEnglish ? 'en' : 'fr');
+
+      return user;
     } catch (e) {
+      debugPrint('Traveler login error: $e');
+      return null;
+    } finally {
       client.close();
-      print(e);
-      return throw Exception(e);
     }
   }
 
-  _authentification(String email, String pass, context) async {
+  /// Auth globale : d’abord PARTNER, sinon TRAVELER.
+  Future<void> _authenticate(
+      String email, String pass, BuildContext context) async {
     try {
-      // Appel API pour récupérer les données utilisateur
-      var response = await _getUserData(email, pass);
-      var response2 = await _getTravelerData(email, pass);
+      // 1) Partner (Season)
+      User? user = await _loginPartner(email, pass);
 
-      // Vérifier si l'email est vide ou null (éviter le crash)
-      if (response.email.isEmpty && response2.email.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 10),
-                Text(
-                  isEnglish
-                      ? "Email or password incorrect!"
-                      : "Email ou mot de passe erroné",
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 3),
-          ),
+      // 2) Si partner KO → Traveler (Chicaparts)
+      user ??= await _loginTraveler(email, pass);
+
+      if (user == null || user.email.isEmpty) {
+        _showErrorSnack(
+          context,
+          isEnglish
+              ? "Email or password incorrect!"
+              : "Email ou mot de passe erroné",
+        );
+        return;
+      }
+
+      // Routing selon thirdParty normalisé
+      if (user.thirdParty == "partner") {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const BottomMenu(index: 0)),
         );
       } else {
-        // Redirection vers la page principale après connexion
-        !isTraveler
-            ? Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const BottomMenu(index: 0),
-                ),
-              )
-            : Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const BottomMenuTraveler(
-                    index: 0,
-                    results: [],
-                  ),
-                ),
-              );
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const BottomMenuTraveler(index: 0, results: []),
+          ),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  isEnglish
-                      ? "An error occurred: ${e.toString()}"
-                      : "Une erreur est survenue : ${e.toString()}",
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: const Duration(seconds: 4),
-        ),
+      _showErrorSnack(
+        context,
+        (isEnglish ? "An error occurred: " : "Une erreur est survenue : ") +
+            e.toString(),
       );
     }
+  }
+
+  void _showErrorSnack(BuildContext context, String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 }

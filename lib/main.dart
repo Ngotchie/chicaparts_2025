@@ -1,57 +1,68 @@
-import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
+// MODELS & PROVIDERS
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/favorite_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/services/user.dart';
+
+// WIDGETS / ROUTES
+import 'package:chicaparts_partner/widgets/login/login.dart';
 import 'package:chicaparts_partner/widgets/login/account.dart';
 import 'package:chicaparts_partner/widgets/login/welcome.dart';
+import 'package:chicaparts_partner/widgets/menu/bottomMenu.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenuTraveler.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/resumeReservation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:chicaparts_partner/widgets/login/login.dart';
-import 'package:chicaparts_partner/widgets/menu/bottomMenu.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-// import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:provider/provider.dart';
+
+// ---------- CONFIG ----------
+const _kSplashDelay = Duration(milliseconds: 700); // délai très court
+const _kPrimary = Color(0xFF244B6B);
+const _kSecondary = Color(0xFFFBD107); // #FBD107
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Stripe.publishableKey =
-      "pk_live_51PL2lGRqkPd0DuljQ67EL63SVdBOGJNtIu3n7sZSz7SMvBywISzzMDwdTqnSnsSe1EpH5MCmK2VNS8uc5V3jjZ0H00NmThjT5f";
-  Stripe.instance.applySettings();
 
+  // 1) Charger l'utilisateur une seule fois
+  final prefs = await SharedPreferences.getInstance();
+  prefs.setString('app_lang', prefs.getString('app_lang') ?? 'en');
+
+  User? user;
+  final userJson = prefs.getString('user');
+  if (userJson != null) {
+    try {
+      user = User.fromJson(jsonDecode(userJson));
+    } catch (_) {
+      user = null;
+    }
+  }
+
+  // 2) Stripe (mobile only)
+  if (!kIsWeb) {
+    Stripe.publishableKey =
+        "pk_live_51PL2lGRqkPd0DuljQ67EL63SVdBOGJNtIu3n7sZSz7SMvBywISzzMDwdTqnSnsSe1EpH5MCmK2VNS8uc5V3jjZ0H00NmThjT5f";
+
+    await Stripe.instance.applySettings();
+  }
+
+  // 3) Providers (créés maintenant, initialisation lourde après 1er frame)
   final langProvider = LanguageProvider();
   final currencyProvider = CurrencyProvider();
   final exchangeProvider = ExchangeRateProvider();
   final favoriteProvider = FavoriteProvider();
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  bool isGuest = true;
-  dynamic user;
-  final userJson = prefs.getString('user');
-  if (userJson != null) {
-    final decoded = jsonDecode(userJson);
-    user = User.fromJson(decoded);
-    isGuest = false;
-  }
-
-  await langProvider.initLanguage();
-  await currencyProvider.initCurrency();
-  await exchangeProvider.loadRates();
-  await favoriteProvider.loadFavorites(isGuest: isGuest, user: user);
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Color(0xFF244B6B), // même couleur
-      statusBarIconBrightness: Brightness.light, // ou dark selon ton fond
-    ),
-  );
+  // 4) Style barre système
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: _kPrimary,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+  ));
 
   runApp(
     MultiProvider(
@@ -61,127 +72,130 @@ void main() async {
         ChangeNotifierProvider(create: (_) => exchangeProvider),
         ChangeNotifierProvider(create: (_) => favoriteProvider),
       ],
-      child: MyApp(),
+      child: MyApp(initialUser: user),
     ),
   );
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      systemNavigationBarColor: Colors.transparent, // navigation bar color
-      statusBarColor:
-          Color(0xff04994b6) //Colors.orange[900] // status bar color
-      ));
+
+  // 5) Warm-up asynchrone (ne bloque pas l’ouverture)
+  //if (user?.thirdParty == 'traveler') {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    try {
+      await langProvider.initLanguage();
+      await currencyProvider.initCurrency();
+      await exchangeProvider.loadRates();
+      await favoriteProvider.loadFavorites(isGuest: false, user: user!);
+    } catch (_) {
+      // silencieux pour ne pas bloquer l'UX ; journaliser si besoin
+    }
+  });
+  //}
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final User? initialUser;
+  const MyApp({super.key, this.initialUser});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Chicaparts',
       debugShowCheckedModeBanner: false,
-      title: 'Chic Partner',
       theme: ThemeData(
-          colorScheme: ColorScheme.fromSwatch().copyWith(
-            primary: const Color(0xFF244B6B), //Color(0xFFF37540),
-            secondary: const Color(0xffffbd107),
-          ),
-          fontFamily: 'Montserrat'),
+        colorScheme: ColorScheme.fromSwatch().copyWith(
+          primary: _kPrimary,
+          secondary: _kSecondary,
+        ),
+        fontFamily: 'Montserrat',
+      ),
+      // On garde le système de routes + Splash en route initiale
       initialRoute: '/',
       routes: {
-        '/': (context) => SplashScreen(),
-        '/login': (context) => LoginPage(),
-        '/account': (context) => AccountPage(),
-        '/welcome': (context) => WelcomePage(),
-        '/booking': (context) => const BottomMenu(index: 1),
-        '/accommodation': (context) => const BottomMenu(index: 0),
-        '/finance': (context) => const BottomMenu(index: 2),
-        '/operation': (context) => const BottomMenu(index: 3),
-        '/home': (context) => const BottomMenuTraveler(
-              index: 0,
-              results: [],
-            ),
-        '/resume-reservation': (context) => const ResumeReservationPage(),
+        '/': (_) => SplashScreen(initialUser: initialUser),
+        '/login': (_) => const LoginPage(),
+        '/account': (_) => const AccountPage(),
+        '/welcome': (_) => const WelcomePage(),
+        '/booking': (_) => const BottomMenu(index: 1),
+        '/accommodation': (_) => const BottomMenu(index: 0),
+        '/finance': (_) => const BottomMenu(index: 2),
+        '/operation': (_) => const BottomMenu(index: 3),
+        '/home': (_) => const BottomMenuTraveler(index: 0, results: []),
+        '/resume-reservation': (_) => const ResumeReservationPage(),
       },
     );
   }
 }
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final User? initialUser;
+  const SplashScreen({super.key, this.initialUser});
 
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  String currentEmail = "";
-  late User user;
-
-  startTime() async {
-    var duration = const Duration(seconds: 4);
-    return Timer(duration, navigationPage);
-  }
-
-  getData() async {}
-
-  void navigationPage() async {
-    WidgetsFlutterBinding.ensureInitialized(); // ✅ Assure l'initialisation
-
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      setState(() {
-        currentEmail = prefs.getString('email') ?? "";
-        final userJson = prefs.getString('user');
-        if (userJson != null) {
-          final decoded = jsonDecode(userJson);
-          user = User.fromJson(decoded);
-        }
-      });
-    } catch (e) {
-      Navigator.of(context).pushReplacementNamed('/welcome');
-      print("Erreur lors du chargement des données: $e");
-    }
-    if (currentEmail != "") {
-      user.thirdParty != "traveler"
-          ? Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const BottomMenu(index: 0),
-              ),
-            )
-          : Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const BottomMenuTraveler(
-                  index: 0,
-                  results: [],
-                ),
-              ),
-            );
-    } else {
-      // Navigator.of(context).pushReplacementNamed('/login');
-      Navigator.of(context).pushReplacementNamed('/welcome');
-    }
-  }
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
 
   @override
   void initState() {
     super.initState();
-    startTime();
+
+    // Petit effet visuel rapide
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..forward();
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+
+    // Délai court puis navigation en fonction du user
+    Future.delayed(_kSplashDelay, _goNext);
+  }
+
+  void _goNext() {
+    final user = widget.initialUser;
+
+    // Choix de la page selon le type d'utilisateur
+    if (user != null && user.thirdParty == 'traveler') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const BottomMenuTraveler(index: 0, results: []),
+        ),
+      );
+      return;
+    }
+
+    if (user != null && user.thirdParty == 'partner') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const BottomMenu(index: 0)),
+      );
+      return;
+    }
+
+    // Non connecté → welcome
+    Navigator.of(context).pushReplacementNamed('/welcome');
   }
 
   @override
   void dispose() {
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Splash simple (image + fond) avec un petit fade-in
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
-        child: Image.asset(
-          "assets/images/new-logo.png",
-          width: 200,
+        child: FadeTransition(
+          opacity: _fade,
+          child: Image.asset(
+            'assets/images/new-logo.png',
+            width: 200,
+            fit: BoxFit.contain,
+          ),
         ),
       ),
     );

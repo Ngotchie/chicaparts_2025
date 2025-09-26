@@ -1,0 +1,118 @@
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.melos_tool/
+coverage/
+build/
+flutter_*.png
+
+# Conserver pubspec.lock pour une APP (verrouiller les versions)
+# (si vous publiez une LIBRARIE, vous pouvez l'ignorer à la place)
+# !pubspec.lock
+
+# --- Logs & temporaires ---
+*.log
+*.tmp
+*.swp
+*.swo
+*.orig
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDE ---
+# Android Studio / IntelliJ
+.idea/
+*.iml
+#.name # (décommentez si nécessaire)
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# --- Android ---
+android/.gradle/
+android/.idea/
+android/local.properties
+android/key.properties
+android/**/gradle/local.properties
+
+# Keystores / secrets
+android/app/*.jks
+android/app/*.keystore
+android/app/*-keystore.p12
+
+# Sorties de build
+android/**/build/
+*.apk
+*.aab
+
+# Gradle (garder le wrapper !)
+# NE PAS ignorer :
+# android/gradle/wrapper/gradle-wrapper.properties
+# android/gradle/wrapper/gradle-wrapper.jar
+
+# --- iOS ---
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/.symlinks/
+ios/Pods/
+ios/build/
+# Garder Podfile & Podfile.lock (recommandé)
+# !ios/Podfile
+# !ios/Podfile.lock
+
+# Xcode
+ios/*.xcworkspace/
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# --- macOS ---
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/build/
+macos/*.xcworkspace/
+macos/*.xcodeproj/project.xcworkspace/
+macos/*.xcodeproj/xcuserdata/
+
+# --- Web ---
+web/.dart_tool/
+web/build/
+
+# --- Linux / Windows ---
+linux/flutter/ephemeral/
+linux/build/
+windows/flutter/ephemeral/
+windows/build/
+
+# --- Env / config perso ---
+.env
+.env.*
+*.secrets.json
+*.private.json
+
+# --- Fastlane / livraison (gardez les metadata si vous les maintenez dans Git) ---
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+# décommentez pour ignorer aussi les metadata locales générées :
+# fastlane/metadata
+
+# --- Firebase (au choix) ---
+# Ces fichiers NE sont pas secrets, vous pouvez les versionner.
+# Si vous préférez les gérer via le CI, décommentez pour les ignorer :
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+
+# --- Autres caches ---
+.merged_manifests/

@@ -322,51 +322,90 @@ class _AccountPageState extends State<AccountPage> {
     bool hasError = false,
     String? errorText,
   }) {
-    return isPhoneField
-        ? _buildPhoneNumberField(hintText)
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: hasError ? Colors.red : Colors.transparent,
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(2, 2),
-                    ),
-                  ],
+    if (isPhoneField) {
+      return _buildPhoneNumberField(hintText);
+    }
+
+    String? _error = errorText;
+    bool _obscure = isPassword; // état local (visible/masqué)
+
+    return StatefulBuilder(
+      builder: (context, setFieldState) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: hasError ? Colors.red : Colors.transparent,
+                  width: 1.5,
                 ),
-                child: TextField(
-                  controller: controller,
-                  obscureText: isPassword,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    prefixIcon: Icon(icon, color: Colors.white),
-                    hintText: hintText,
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(2, 2),
                   ),
+                ],
+              ),
+              child: TextField(
+                controller: controller,
+                obscureText: _obscure,
+                obscuringCharacter: '•',
+                enableSuggestions: !isPassword,
+                autocorrect: !isPassword,
+                keyboardType:
+                    isPassword ? TextInputType.text : TextInputType.text,
+                style: const TextStyle(color: Colors.white),
+                onChanged: (value) {
+                  // si tu veux mettre une validation live plus tard,
+                  // mets-la ici et affecte _error via setFieldState(...)
+                },
+                decoration: InputDecoration(
+                  prefixIcon: Icon(icon, color: Colors.white),
+                  hintText: hintText,
+                  hintStyle: const TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 0),
+
+                  // 👇 Bouton afficher/masquer (avec "peek" en appui long)
+                  suffixIcon: isPassword
+                      ? GestureDetector(
+                          onTap: () =>
+                              setFieldState(() => _obscure = !_obscure),
+                          onLongPressStart: (_) =>
+                              setFieldState(() => _obscure = false),
+                          onLongPressEnd: (_) =>
+                              setFieldState(() => _obscure = true),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Icon(
+                              _obscure
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
-              if (hasError && errorText != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4.0, left: 8),
-                  child: Text(
-                    errorText,
-                    style:
-                        const TextStyle(color: Colors.redAccent, fontSize: 12),
-                  ),
+            ),
+            if ((hasError && errorText != null) || _error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0, left: 8),
+                child: Text(
+                  _error ?? errorText!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                 ),
-            ],
-          );
+              ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildPhoneNumberField(String hintText) {

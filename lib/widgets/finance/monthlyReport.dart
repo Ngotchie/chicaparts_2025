@@ -90,8 +90,7 @@ class _MonthlyReportWidgetState extends State<MonthlyReportWidget> {
                 ),
               ),
               FutureBuilder(
-                  future:
-                      getMonthlyReports(widget.user.thirdParty["id"], filter),
+                  future: getMonthlyReports(widget.user.id, filter),
                   builder: (context, AsyncSnapshot snap) {
                     List<String> accommodations = [];
                     if (snap.data == null) {
