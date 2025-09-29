@@ -91,7 +91,8 @@ class _PaymentOrderWidgetState extends State<PaymentOrderWidget> {
                   ),
                 ),
                 FutureBuilder(
-                    future: getPaymentOrders(widget.user.id, filter),
+                    future:
+                        getPaymentOrders(widget.user.thirdParty["id"], filter),
                     builder: (context, AsyncSnapshot snap) {
                       List<String> accommodations = [];
                       if (snap.data == null) {

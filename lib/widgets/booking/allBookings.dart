@@ -59,7 +59,8 @@ class _AllBookingWidgetState extends State<AllBookingWidget>
   }
 
   Future<List<Booking>> getBooking(range) {
-    return apiBooking.getBookings(widget.user.id, range, 'others');
+    return apiBooking.getBookings(
+        widget.user.thirdParty["id"], range, 'others');
   }
 
   TextEditingController searchController = TextEditingController();

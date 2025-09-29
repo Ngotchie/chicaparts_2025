@@ -23,7 +23,7 @@ class _BookingAccommodationWidgetState
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: FutureBuilder(
-          future: callApiListAcc(widget.user.id),
+          future: callApiListAcc(widget.user.thirdParty["id"]),
           builder: (BuildContext context, AsyncSnapshot snapshot) {
             if (snapshot.data == null) {
               return Container(

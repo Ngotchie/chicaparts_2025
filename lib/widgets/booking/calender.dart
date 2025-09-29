@@ -30,7 +30,8 @@ class _CalendarWidgetState extends State<CalendarWidget> {
 
   final apiBooking = ApiBooking();
   Future<List<Booking>> getBooking(range) {
-    return apiBooking.getBookings(widget.user.id, range, 'others');
+    return apiBooking.getBookings(
+        widget.user.thirdParty["id"], range, 'others');
   }
 
   List<CalendarBooking> _getDataSource(data) {
@@ -167,7 +168,7 @@ class _CalendarWidgetState extends State<CalendarWidget> {
     final methods = Methods();
     if (details.targetElement == CalendarElement.calendarCell) {
       final dynamic booking = details.appointments![0].id;
-      methods.showBooking(context, booking, 0, widget.user.id);
+      methods.showBooking(context, booking, 0, widget.user.thirdParty["id"]);
     }
   }
 

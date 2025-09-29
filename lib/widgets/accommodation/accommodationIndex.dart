@@ -41,7 +41,7 @@ class _AccommodationIndexWidgetState extends State<AccommodationIndexWidget> {
           color: Colors.white,
           child: Column(children: <Widget>[
             FutureBuilder(
-                future: callApiListAcc(widget.user.id),
+                future: callApiListAcc(widget.user.thirdParty["id"]),
                 builder: (BuildContext context, AsyncSnapshot snapshot) {
                   if (snapshot.data == null) {
                     return Container(

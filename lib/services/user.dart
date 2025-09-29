@@ -18,9 +18,10 @@ class CurrentUser {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var currentEmail = prefs.getString('email') ?? "";
     if (currentEmail != "") {
-      String currentUser = prefs.getString('user') ?? "";
+      String currentUser = prefs.getString('user_raw_partner') ?? "";
+      print(currentUser);
       var jsonData = jsonDecode(currentUser);
-      // print(jsonData);
+      print(jsonData);
       user = User(jsonData["id"], jsonData["name"], jsonData["email"],
           jsonData["third_party"]);
     }

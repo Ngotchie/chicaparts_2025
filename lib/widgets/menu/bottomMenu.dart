@@ -38,6 +38,7 @@ class _BottomMenuState extends State<BottomMenu> {
   void initState() {
     super.initState();
     currentUser.getCurrentUser().then((result) {
+      print(result);
       setState(() {
         user = result;
       });
