@@ -169,7 +169,7 @@ class _AccountPageState extends State<AccountPage> {
                               Navigator.pushReplacementNamed(context, "/login");
                             }
                           },
-                          activeColor:
+                          activeThumbColor:
                               const Color(0xFFFFC107), // Jaune charte graphique
                         ),
                         Text(isEnglish ? "Traveler" : "Voyageur",
@@ -286,7 +286,7 @@ class _AccountPageState extends State<AccountPage> {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (_) => WelcomePage()),
+                      MaterialPageRoute(builder: (_) => const WelcomePage()),
                     );
                   },
                 ),
@@ -326,8 +326,8 @@ class _AccountPageState extends State<AccountPage> {
       return _buildPhoneNumberField(hintText);
     }
 
-    String? _error = errorText;
-    bool _obscure = isPassword; // état local (visible/masqué)
+    String? error = errorText;
+    bool obscure = isPassword; // état local (visible/masqué)
 
     return StatefulBuilder(
       builder: (context, setFieldState) {
@@ -352,7 +352,7 @@ class _AccountPageState extends State<AccountPage> {
               ),
               child: TextField(
                 controller: controller,
-                obscureText: _obscure,
+                obscureText: obscure,
                 obscuringCharacter: '•',
                 enableSuggestions: !isPassword,
                 autocorrect: !isPassword,
@@ -374,18 +374,15 @@ class _AccountPageState extends State<AccountPage> {
                   // 👇 Bouton afficher/masquer (avec "peek" en appui long)
                   suffixIcon: isPassword
                       ? GestureDetector(
-                          onTap: () =>
-                              setFieldState(() => _obscure = !_obscure),
+                          onTap: () => setFieldState(() => obscure = !obscure),
                           onLongPressStart: (_) =>
-                              setFieldState(() => _obscure = false),
+                              setFieldState(() => obscure = false),
                           onLongPressEnd: (_) =>
-                              setFieldState(() => _obscure = true),
+                              setFieldState(() => obscure = true),
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8.0),
                             child: Icon(
-                              _obscure
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
+                              obscure ? Icons.visibility_off : Icons.visibility,
                               color: Colors.white,
                             ),
                           ),
@@ -394,11 +391,11 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ),
             ),
-            if ((hasError && errorText != null) || _error != null)
+            if ((hasError && errorText != null) || error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, left: 8),
                 child: Text(
-                  _error ?? errorText!,
+                  error ?? errorText!,
                   style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                 ),
               ),

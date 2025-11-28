@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/favorite_repository.dart';
 
 class FavoriteProvider with ChangeNotifier {

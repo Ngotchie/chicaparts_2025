@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           children: [
                             Text(
                               lang.t('settings'),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF244B6B),
@@ -115,7 +115,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
               /// 🌙 Mode sombre
               SwitchListTile(
-                activeColor: const Color(0xFF244B6B),
+                activeThumbColor: const Color(0xFF244B6B),
                 title: Text(
                   lang.t('mode'),
                   style: TextStyle(
@@ -143,7 +143,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
               /// 🔔 Notifications
               SwitchListTile(
-                activeColor: const Color(0xFF244B6B),
+                activeThumbColor: const Color(0xFF244B6B),
                 title: Text(
                   lang.t('notifications'),
                   style: TextStyle(

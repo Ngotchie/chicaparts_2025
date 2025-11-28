@@ -85,13 +85,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       if (response.statusCode == 200) {
+        final user = User(currentUser.id, firstNameController.text,
+            currentUser.email, "traveler");
+        await prefs.setString('user', jsonEncode(user.toJson()));
         Navigator.pop(context, true);
       } else {
-        final msg = jsonDecode(response.body)['error'] ?? 'Unknow error';
-        _showError(context, msg.toString());
+        _showError(context, "Unknow error");
       }
     } catch (e) {
-      _showError(context, "Network error : $e");
+      _showError(context, "Network error");
     } finally {
       setState(() => _isSaving = false);
     }
@@ -116,82 +118,316 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+
     return Scaffold(
-      appBar: AppBar(title: Text("✏️ ${lang.t('edit_profile')}")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              _buildTextField(lang.t('first_name'), firstNameController),
-              _buildTextField(lang.t('last_name'), lastNameController),
-              _buildGenderField(),
-              _buildTextField(lang.t('city'), cityController),
-              _buildTextField(lang.t('phone'), phoneController),
-              _buildTextField(lang.t('zip'), zipCodeController),
-              _buildTextField(lang.t('state'), stateController),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF244B6B),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onPressed: _isSaving ? null : _submitChanges,
-                child: _isSaving
-                    ? const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                    : Text(
-                        "💾 ${lang.t('save')}",
-                        style: const TextStyle(color: Colors.white),
-                      ),
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text("✏️ ${lang.t('edit_profile')}"),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF244B6B),
+      ),
+
+      // ✅ bouton enregistré collé en bas, comme sur la page profil
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white)),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(
+                _isSaving ? lang.t('saving') : "💾 ${lang.t('save')}",
+                style: const TextStyle(color: Colors.white),
               ),
-            ],
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF244B6B),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isSaving ? null : _submitChanges,
+            ),
           ),
         ),
       ),
-    );
-  }
 
-  Widget _buildTextField(String label, TextEditingController controller) {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.grey.shade300)),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          children: [
+            // === Header compact (aligné avec la page Profil)
+            // Card(
+            //   elevation: 0,
+            //   color: Colors.white,
+            //   shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(14)),
+            //   child: Padding(
+            //     padding: const EdgeInsets.all(16),
+            //     child: Row(
+            //       children: [
+            //         const CircleAvatar(
+            //           radius: 28,
+            //           backgroundColor: Color(0xFF244B6B),
+            //           child: Icon(Icons.person, color: Colors.white, size: 28),
+            //         ),
+            //         const SizedBox(width: 12),
+            //         Expanded(
+            //           child: Column(
+            //             crossAxisAlignment: CrossAxisAlignment.start,
+            //             children: [
+            //               Text(
+            //                 "${widget.user.firstName} ${widget.user.lastName}"
+            //                         .trim()
+            //                         .isEmpty
+            //                     ? lang.t('user')
+            //                     : "${widget.user.firstName} ${widget.user.lastName}",
+            //                 style: const TextStyle(
+            //                     fontSize: 18, fontWeight: FontWeight.w700),
+            //                 maxLines: 1,
+            //                 overflow: TextOverflow.ellipsis,
+            //               ),
+            //               const SizedBox(height: 2),
+            //               Text(
+            //                 widget.user.email,
+            //                 style: TextStyle(
+            //                     fontSize: 13, color: Colors.grey[600]),
+            //                 maxLines: 1,
+            //                 overflow: TextOverflow.ellipsis,
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //         TextButton.icon(
+            //           onPressed: () {}, // (optionnel) changer la photo
+            //           icon: const Icon(Icons.edit, size: 18),
+            //           label: Text(lang.t('edit')),
+            //         )
+            //       ],
+            //     ),
+            //   ),
+            // ),
+
+            // const SizedBox(height: 12),
+
+            // === Section : Informations personnelles
+            _SectionCard(
+              title: lang.t('personal_infos'),
+              children: [
+                _buildTextField(
+                  lang.t('first_name'),
+                  firstNameController,
+                  prefix: Icons.badge,
+                ),
+                _buildTextField(
+                  lang.t('last_name'),
+                  lastNameController,
+                  isRequired: false,
+                  prefix: Icons.badge_outlined,
+                ),
+                _buildGenderFieldStyled(),
+              ],
+            ),
+
+            // === Section : Coordonnées
+            _SectionCard(
+              title: lang.t('contact'),
+              children: [
+                _buildTextField(
+                  lang.t('phone'),
+                  phoneController,
+                  keyboard: TextInputType.phone,
+                  prefix: Icons.phone_outlined,
+                ),
+                // email affiché en lecture seule pour cohérence avec la page profil
+                _DisplayTile(
+                  icon: Icons.email_outlined,
+                  label: "Email",
+                  value: widget.user.email,
+                ),
+              ],
+            ),
+
+            // === Section : Adresse
+            _SectionCard(
+              title: lang.t('address'),
+              children: [
+                _buildTextField(
+                  lang.t('city'),
+                  cityController,
+                  isRequired: false,
+                  prefix: Icons.location_city_outlined,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        lang.t('zip'),
+                        zipCodeController,
+                        isRequired: false,
+                        keyboard: TextInputType.number,
+                        prefix: Icons.local_post_office_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildTextField(
+                        lang.t('state'),
+                        stateController,
+                        isRequired: false,
+                        prefix: Icons.map_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+          ],
         ),
-        validator: (value) =>
-            value == null || value.isEmpty ? lang.t('required') : null,
       ),
     );
   }
 
-  Widget _buildGenderField() {
+// ======= Genre avec style cohérent
+  Widget _buildGenderFieldStyled() {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: DropdownButtonFormField<String>(
-        value: selectedGender,
-        decoration: InputDecoration(
-          labelText: lang.t('gender'),
-          border: const OutlineInputBorder(),
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    );
+
+    return DropdownButtonFormField<String>(
+      value: (selectedGender ?? '').isEmpty ? null : selectedGender,
+      decoration: InputDecoration(
+        labelText: lang.t('gender'),
+        prefixIcon: const Icon(Icons.transgender),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.2),
         ),
-        items: [
-          DropdownMenuItem(value: '', child: Text(lang.t('select_gender'))),
-          DropdownMenuItem(value: "m", child: Text(lang.t('male'))),
-          DropdownMenuItem(value: "f", child: Text(lang.t('fmale'))),
-        ],
-        onChanged: (value) => setState(() => selectedGender = value),
-        validator: (value) =>
-            value == null || value.isEmpty ? lang.t('required') : null,
+      ),
+      items: [
+        DropdownMenuItem(value: 'm', child: Text(lang.t('male'))),
+        DropdownMenuItem(value: 'f', child: Text(lang.t('female'))),
+      ],
+      onChanged: (v) => setState(() => selectedGender = v),
+    );
+  }
+}
+
+/// ====== Helpers UI (légers) ======
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  const _SectionCard({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF244B6B))),
+            const SizedBox(height: 8),
+            ..._withDividers(children),
+          ],
+        ),
       ),
     );
   }
+
+  List<Widget> _withDividers(List<Widget> items) {
+    final out = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      out.add(items[i]);
+      if (i != items.length - 1) {
+        out.add(const SizedBox(height: 10));
+      }
+    }
+    return out;
+  }
+}
+
+/// Affichage lecture seule (email)
+class _DisplayTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DisplayTile(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      initialValue: value,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+      ),
+    );
+  }
+}
+
+// ======= Remplace ta version par celle-ci pour garder ton nullable + icônes
+Widget _buildTextField(
+  String label,
+  TextEditingController controller, {
+  bool isRequired = true,
+  TextInputType keyboard = TextInputType.text,
+  IconData? prefix,
+}) {
+  final border = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: Colors.grey.shade300),
+  );
+
+  return TextFormField(
+    controller: controller,
+    keyboardType: keyboard,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: prefix != null ? Icon(prefix) : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.2),
+      ),
+    ),
+    validator: (value) {
+      if (!isRequired) return null;
+      if (value == null || value.trim().isEmpty) return 'Champ requis';
+      return null;
+    },
+  );
 }

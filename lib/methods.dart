@@ -443,7 +443,7 @@ class Methods {
                                                       BorderRadius.circular(
                                                           15.0)),
                                             ),
-                                            value: propertyValue,
+                                            initialValue: propertyValue,
                                             items: properties
                                                 .map<DropdownMenuItem<int>>(
                                                     (item) {
@@ -535,7 +535,7 @@ class Methods {
                                                       BorderRadius.circular(
                                                           15.0)),
                                             ),
-                                            value: statusValue,
+                                            initialValue: statusValue,
                                             items: listStatus
                                                 .map<DropdownMenuItem<String>>(
                                                     (String value) {

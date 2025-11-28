@@ -15,8 +15,7 @@ class PaymentPage extends StatefulWidget {
   final BillingInfo billingInfo;
 
   const PaymentPage(
-      {Key? key, required this.bookingDetails, required this.billingInfo})
-      : super(key: key);
+      {super.key, required this.bookingDetails, required this.billingInfo});
 
   @override
   _PaymentPageState createState() => _PaymentPageState();

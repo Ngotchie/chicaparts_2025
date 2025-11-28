@@ -272,11 +272,11 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void openFilterModal() {
-    final Color primaryBlue = const Color(0xFF244B6B);
-    final Color accentOrange = const Color(0xFFF37540);
-    final Color yellow = const Color(0xFFFBD107);
-    final Color turquoise = const Color(0xFF05A8CF);
-    final Color vert = const Color(0xFF54bf31);
+    const Color primaryBlue = Color(0xFF244B6B);
+    const Color accentOrange = Color(0xFFF37540);
+    const Color yellow = Color(0xFFFBD107);
+    const Color turquoise = Color(0xFF05A8CF);
+    const Color vert = Color(0xFF54bf31);
 
     final lang = context.read<LanguageProvider>();
 

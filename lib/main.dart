@@ -1,4 +1,12 @@
 import 'dart:convert';
+import 'package:chicaparts_partner/widgets/booking/myBookings.dart';
+import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
+import 'package:chicaparts_partner/widgets/traveler/favorites/favorites.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/bookingDetails.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/myBooking.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/my_reviews_page.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/profile.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/setting.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -120,6 +128,48 @@ class MyApp extends StatelessWidget {
         '/operation': (_) => const BottomMenu(index: 3),
         '/home': (_) => const BottomMenuTraveler(index: 0, results: []),
         '/resume-reservation': (_) => const ResumeReservationPage(),
+        '/account/settings': (_) => const SettingsPage(),
+        '/account/profile': (_) => const ProfilePage(),
+        '/reservations': (_) => const MyReservationsPage(),
+        '/favorites': (_) => const BottomMenuTraveler(index: 2, results: []),
+      },
+      onGenerateRoute: (settings) {
+        final name = settings.name ?? '';
+        final uri = Uri.parse(name);
+
+        // /reservations/<id>
+        if (uri.pathSegments.length == 2 &&
+            uri.pathSegments[0] == 'reservations') {
+          final id = uri.pathSegments[1];
+          return MaterialPageRoute(
+            builder: (_) => BookingDetailsPage(bookingId: id),
+            settings: settings,
+          );
+        }
+
+        //accommodation/<id>
+        if (uri.pathSegments.length == 2 &&
+            uri.pathSegments[0] == 'accommodation') {
+          final id = uri.pathSegments[1];
+          final currency = uri.pathSegments[2];
+          final price = uri.pathSegments[1];
+          return MaterialPageRoute(
+            builder: (_) => AccommodationDetails(
+              accommodationId: id as int,
+              currency: currency,
+              dayPrice: price as double,
+            ),
+            settings: settings,
+          );
+        }
+
+        if (name == '/avis') {
+          return MaterialPageRoute(
+            builder: (_) => const MyReviewsPage(),
+            settings: settings,
+          );
+        }
+        return null; // laisser Flutter gérer les autres
       },
     );
   }

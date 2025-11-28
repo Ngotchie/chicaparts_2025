@@ -88,7 +88,7 @@ class _BillingInfoPageState extends State<BillingInfoPage> {
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: DropdownButtonFormField(
         decoration: _inputDecoration(label, icon),
-        value: value,
+        initialValue: value,
         items: items
             .map((c) => DropdownMenuItem(value: c, child: Text(c)))
             .toList(),

@@ -17,7 +17,7 @@ class ApiBooking {
     try {
       var data = await client.get(
           Uri.parse(
-              '${apiUrl + 'apikey/partners/booking?partner=' + partner.toString() + '&start=' + se[0] + '&end=' + se[1]}&type=' +
+              '${'${apiUrl}apikey/partners/booking?partner=$partner&start=' + se[0] + '&end=' + se[1]}&type=' +
                   type),
           headers: {
             'Accept': 'application/json',
@@ -47,6 +47,8 @@ class ApiBooking {
           book["notes"] != null ? Text(book["notes"]) : const Text(""),
           book["roomId"] ?? 0,
           book["propId"] ?? 0,
+          "",
+          "",
           book["multiplier"] ?? "Not defined",
         );
 

@@ -25,97 +25,170 @@ class ApiAccommodation {
         var jsonData = jsonDecode(data.body);
         var accomodation = jsonData["data"];
         OneAccommodation acc = OneAccommodation(
-            accomodation["id"],
-            accomodation["ref"] ?? "",
-            accomodation["status"] ?? "",
-            accomodation["internal_name"] ?? "",
-            accomodation["external_name"] ?? "",
-            accomodation["other_name"] ?? "",
-            accomodation["type_accommodation"] ?? "",
-            accomodation["checkin_method"] ?? "",
-            accomodation["entire_place"] ?? false,
-            accomodation["capacity"] ?? 0,
-            accomodation["area"] ?? 0,
-            accomodation["floor_number"] ?? 0,
-            accomodation["door_number"] ?? "",
-            accomodation["has_elevator"] ?? false,
-            accomodation["self_checkin"] ?? false,
-            accomodation["description"] != null
-                ? Text(accomodation["description"])
-                : const Text(""),
-            accomodation["details"] != null
-                ? Text(accomodation["details"])
-                : const Text(""),
-            accomodation["access_instruction_fr"] != null
-                ? Text(accomodation["access_instruction_fr"])
-                : const Text(""),
-            accomodation["latitude"] ?? 0,
-            accomodation["longitude"] ?? 0,
-            accomodation["photos"] ?? "",
-            accomodation["mail_box_location"] != null
-                ? Text(accomodation["mail_box_location"])
-                : const Text(""),
-            accomodation["mail_box_number"] ?? "",
-            accomodation["mail_boxe_name"] ?? "",
-            accomodation["address1"] ?? "",
-            accomodation["address2"] ?? "",
-            accomodation["address3"] ?? "",
-            accomodation["state"] ?? "",
-            accomodation["country_id"] ?? 0,
-            accomodation["city"] ?? "",
-            accomodation["zip"] ?? "",
-            accomodation["access_instruction_to_the_building"] != null
-                ? Text(accomodation["access_instruction_to_the_building"])
-                : const Text(""),
-            accomodation["access_instruction_to_the_apartment"] != null
-                ? Text(accomodation["access_instruction_to_the_apartment"])
-                : const Text(""),
-            accomodation["building_management_compagny_details"] != null
-                ? Text(accomodation["building_management_compagny_details"])
-                : const Text(""),
-            accomodation["elevator_management_compagny_details"] != null
-                ? Text(accomodation["elevator_management_compagny_details"])
-                : const Text(""),
-            accomodation["heading_transport"] != null
-                ? Text(accomodation["heading_transport"])
-                : const Text(""),
-            accomodation["public_transport_nearby"] != null
-                ? Text(accomodation["public_transport_nearby"])
-                : const Text(""),
-            accomodation["energy_line_identifiere"] != null
-                ? Text(accomodation["energy_line_identifiere"])
-                : const Text(""),
-            accomodation["access_instruction_en"] != null
-                ? Text(accomodation["access_instruction_en"])
-                : const Text(''),
-            accomodation["checkout_instructions_en"] != null
-                ? Text(accomodation["checkout_instructions_en"])
-                : const Text(""),
-            accomodation["checkout_instructions_fr"] != null
-                ? Text(accomodation["checkout_instructions_fr"])
-                : const Text(""),
-            accomodation["coffee_machine_type"] != null
-                ? Text(accomodation["coffee_machine_type"])
-                : const Text(""),
-            accomodation["currency"] ?? "",
-            accomodation["disable_acces"] ?? false,
-            accomodation["hotplatesystem"] != null
-                ? Text(accomodation["hotplatesystem"])
-                : const Text(""),
-            accomodation["pricing_plan"] != null
-                ? Text(accomodation["pricing_plan"])
-                : const Text(""),
-            accomodation["profil_selection"] ?? "",
-            accomodation["telecomLine_identifiere"] != null
-                ? Text(accomodation["telecomLine_identifiere"])
-                : const Text(""),
-            accomodation["transaction_location"] != null
-                ? Text(accomodation["transaction_location"])
-                : const Text(""),
-            accomodation["wifi_identifiers"] != null
-                ? Text(accomodation["wifi_identifiers"])
-                : const Text(""),
-            accomodation["hosting_platforms"]);
+          accomodation["id"],
+          accomodation["ref"] ?? "",
+          accomodation["status"] ?? "",
+          accomodation["internal_name"] ?? "",
+          accomodation["external_name"] ?? "",
+          accomodation["other_name"] ?? "",
+          accomodation["type_accommodation"] ?? "",
+          accomodation["checkin_method"] ?? "",
+          accomodation["entire_place"] ?? false,
+          accomodation["capacity"] ?? 0,
+          accomodation["area"] ?? 0,
+          accomodation["floor_number"] ?? 0,
+          accomodation["door_number"] ?? "",
+          accomodation["has_elevator"] ?? false,
+          accomodation["self_checkin"] ?? false,
+
+          // Strings simples → Text(...)
+          accomodation["description"] != null
+              ? Text(accomodation["description"])
+              : const Text(""),
+          accomodation["details"] != null
+              ? Text(accomodation["details"])
+              : const Text(""),
+          accomodation["access_instruction_fr"] != null
+              ? Text(accomodation["access_instruction_fr"])
+              : const Text(""),
+
+          // Numériques
+          (accomodation["latitude"] ?? 0).toDouble(),
+          (accomodation["longitude"] ?? 0).toDouble(),
+
+          // URL photos (string)
+          accomodation["photos"] ?? "",
+
+          // mailbox_* (nouveaux noms, fallback anciens)
+          (accomodation["mailbox_location"] ??
+                      accomodation["mail_box_location"]) !=
+                  null
+              ? Text(accomodation["mailbox_location"] ??
+                  accomodation["mail_box_location"])
+              : const Text(""),
+          accomodation["mailbox_number"] ??
+              accomodation["mail_box_number"] ??
+              "",
+          accomodation["mailbox_name"] ?? accomodation["mail_boxe_name"] ?? "",
+
+          // Adresse
+          accomodation["address1"] ?? "",
+          accomodation["address2"] ?? "",
+          accomodation["address3"] ?? "",
+          accomodation["state"] ?? "",
+          accomodation["country_id"] ?? 0,
+          accomodation["city"] ?? "",
+          accomodation["zip"] ?? "",
+
+          // access_instructions_* (nouveaux noms, fallback anciens)
+          (accomodation["access_instructions_to_the_building"] ??
+                      accomodation["access_instruction_to_the_building"]) !=
+                  null
+              ? Text(accomodation["access_instructions_to_the_building"] ??
+                  accomodation["access_instruction_to_the_building"])
+              : const Text(""),
+          (accomodation["access_instructions_to_the_apartment"] ??
+                      accomodation["access_instruction_to_the_apartment"]) !=
+                  null
+              ? Text(accomodation["access_instructions_to_the_apartment"] ??
+                  accomodation["access_instruction_to_the_apartment"])
+              : const Text(""),
+
+          // *company_details (nouveaux noms)
+          accomodation["building_management_company_details"] != null
+              ? Text(accomodation["building_management_company_details"])
+              : const Text(""),
+          accomodation["elevator_management_company_details"] != null
+              ? Text(accomodation["elevator_management_company_details"])
+              : const Text(""),
+
+          // heating_system (nouveau)  — ancien: heading_transport (on garde en fallback visuel)
+          (accomodation["heating_system"] ??
+                      accomodation["heading_transport"]) !=
+                  null
+              ? Text(accomodation["heating_system"] ??
+                  accomodation["heading_transport"])
+              : const Text(""),
+
+          // public_transports_nearby (nouveau)
+          accomodation["public_transports_nearby"] != null
+              ? Text(accomodation["public_transports_nearby"])
+              : const Text(""),
+
+          // energy_line_identifier (nouveau)
+          accomodation["energy_line_identifier"] != null
+              ? Text(accomodation["energy_line_identifier"])
+              : const Text(""),
+
+          // access_instruction_en (string → Text)
+          accomodation["access_instruction_en"] != null
+              ? Text(accomodation["access_instruction_en"])
+              : const Text(''),
+
+          // checkout_instructions_*
+          accomodation["checkout_instructions_en"] != null
+              ? Text(accomodation["checkout_instructions_en"])
+              : const Text(""),
+          accomodation["checkout_instructions_fr"] != null
+              ? Text(accomodation["checkout_instructions_fr"])
+              : const Text(""),
+
+          // coffee_machine_type
+          accomodation["coffee_machine_type"] != null
+              ? Text(accomodation["coffee_machine_type"])
+              : const Text(""),
+
+          // currency → l'API renvoie désormais currency_id (int). On garde String attendu.
+          (accomodation["currency"] ??
+              (accomodation["currency_id"] != null
+                  ? accomodation["currency_id"].toString()
+                  : "")),
+
+          // disabled_access (nouveau)
+          accomodation["disabled_access"] ??
+              accomodation["disable_acces"] ??
+              false,
+
+          // hotplate_system (nouveau)
+          accomodation["hotplate_system"] != null
+              ? Text(accomodation["hotplate_system"])
+              : const Text(""),
+
+          // pricing_plan (string → Text)
+          accomodation["pricing_plan"] != null
+              ? Text(accomodation["pricing_plan"])
+              : const Text(""),
+
+          // profile_selection (nouveau)
+          accomodation["profile_selection"] ??
+              accomodation["profil_selection"] ??
+              "",
+
+          // telcom_line_identifier (nouveau)
+          (accomodation["telcom_line_identifier"] ??
+                      accomodation["telecomLine_identifiere"]) !=
+                  null
+              ? Text(accomodation["telcom_line_identifier"] ??
+                  accomodation["telecomLine_identifiere"])
+              : const Text(""),
+
+          // trash_location (nouveau)
+          (accomodation["trash_location"] ??
+                      accomodation["transaction_location"]) !=
+                  null
+              ? Text(accomodation["trash_location"] ??
+                  accomodation["transaction_location"])
+              : const Text(""),
+
+          // wifi_identifiers (string → Text)
+          accomodation["wifi_identifiers"] != null
+              ? Text(accomodation["wifi_identifiers"])
+              : const Text(""),
+
+          // hosting_platforms (liste telle quelle)
+          accomodation["hosting_platforms"],
+        );
+
         return acc;
       } else {
         return null;

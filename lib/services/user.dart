@@ -19,11 +19,10 @@ class CurrentUser {
     var currentEmail = prefs.getString('email') ?? "";
     if (currentEmail != "") {
       String currentUser = prefs.getString('user_raw_partner') ?? "";
-      print(currentUser);
       var jsonData = jsonDecode(currentUser);
-      print(jsonData);
       user = User(jsonData["id"], jsonData["name"], jsonData["email"],
           jsonData["third_party"]);
+      //print(user.third_party);
     }
     return user;
   }

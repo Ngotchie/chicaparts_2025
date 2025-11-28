@@ -77,7 +77,7 @@ class _MaintenanceWidgetState extends State<MaintenanceWidget> {
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(15.0)),
                         ),
-                        value: natureValue,
+                        initialValue: natureValue,
                         onChanged: (String? newValue) {
                           setState(() {
                             natureValue = newValue!;
@@ -105,7 +105,7 @@ class _MaintenanceWidgetState extends State<MaintenanceWidget> {
                         });
                       },
                       activeTrackColor: Colors.grey,
-                      activeColor: const Color(0xFF244B6B),
+                      activeThumbColor: const Color(0xFF244B6B),
                     ),
                   ),
                   Container(

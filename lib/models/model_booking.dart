@@ -21,6 +21,8 @@ class Booking {
   Text note;
   int roomId;
   int propId;
+  String img;
+  String city;
 
   dynamic multiplier;
 
@@ -45,10 +47,13 @@ class Booking {
     this.note,
     this.roomId,
     this.propId,
+    this.img,
+    this.city,
     this.multiplier,
   );
 
   factory Booking.fromJson(Map<String, dynamic> json) {
+    // print(json);
     return Booking(
       json['id'] ?? 0,
       json['bookId'] ?? 0,
@@ -72,6 +77,8 @@ class Booking {
       json['notes'] ?? Text(json["notes"] ?? ''),
       json['roomId'] ?? 0,
       json['propId'] ?? 0,
+      json['accommodation']['photos_site'][0],
+      json['accommodation']['city'],
       json['multiplier'] ?? '', // ✅ can be null or dynamic
     );
   }
@@ -98,9 +105,14 @@ class Booking {
       'note': note,
       'roomId': roomId,
       'propId': propId,
+      'img': img,
+      'city': city,
       'multiplier': multiplier,
     };
   }
+
+  @override
+  String toString() => 'Booking${toJson()}';
 }
 
 class OneBooking {

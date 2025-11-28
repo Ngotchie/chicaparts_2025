@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:chicaparts_partner/api/login/login.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/services/api.dart';
 import 'package:chicaparts_partner/services/favorite_repository.dart';
+import 'package:chicaparts_partner/widgets/login/forgot_password.dart';
 import 'package:chicaparts_partner/widgets/login/welcome.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenu.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenuTraveler.dart';
@@ -162,13 +164,19 @@ class LoginPageState extends State<LoginPage> {
                       Center(
                         child: GestureDetector(
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  isEnglish
-                                      ? "Reset password functionality coming soon"
-                                      : "La fonctionnalité de réinitialisation arrive bientôt",
+                            Navigator.of(context).push(
+                              PageRouteBuilder(
+                                transitionDuration:
+                                    const Duration(milliseconds: 300),
+                                pageBuilder: (_, __, ___) => ForgotPasswordPage(
+                                  isEnglish: isEnglish,
+                                  auth: AuthService(
+                                      baseUrl:
+                                          'https://intranet.chic-aparts.com/chicaparts'),
                                 ),
+                                transitionsBuilder: (_, animation, __, child) =>
+                                    FadeTransition(
+                                        opacity: animation, child: child),
                               ),
                             );
                           },
@@ -266,7 +274,7 @@ class LoginPageState extends State<LoginPage> {
     String? Function(String?)? validator,
   }) {
     String? errorText;
-    bool _obscure = isPassword; // état local du champ (visible/masqué)
+    bool obscure = isPassword; // état local du champ (visible/masqué)
 
     return StatefulBuilder(
       builder: (context, setFieldState) {
@@ -287,7 +295,7 @@ class LoginPageState extends State<LoginPage> {
               ),
               child: TextField(
                 controller: controller,
-                obscureText: _obscure,
+                obscureText: obscure,
                 obscuringCharacter: '•',
                 keyboardType: isPassword
                     ? TextInputType.text
@@ -310,19 +318,16 @@ class LoginPageState extends State<LoginPage> {
                   // 👇 Bouton afficher/masquer pour les champs password
                   suffixIcon: isPassword
                       ? GestureDetector(
-                          onTap: () =>
-                              setFieldState(() => _obscure = !_obscure),
+                          onTap: () => setFieldState(() => obscure = !obscure),
                           // Appui long = "peek": montre tant que pressé
                           onLongPressStart: (_) =>
-                              setFieldState(() => _obscure = false),
+                              setFieldState(() => obscure = false),
                           onLongPressEnd: (_) =>
-                              setFieldState(() => _obscure = true),
+                              setFieldState(() => obscure = true),
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8.0),
                             child: Icon(
-                              _obscure
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
+                              obscure ? Icons.visibility_off : Icons.visibility,
                               color: Colors.white,
                             ),
                           ),

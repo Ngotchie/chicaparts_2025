@@ -96,7 +96,7 @@ class _SinisterWidgetState extends State<SinisterWidget> {
                       });
                     },
                     activeTrackColor: Colors.grey,
-                    activeColor: const Color(0xFF244B6B),
+                    activeThumbColor: const Color(0xFF244B6B),
                   ),
                 ),
                 Container(

@@ -397,9 +397,12 @@ showAccommodation(context, accomodation) {
                             );
                           } else {
                             var accomodation = snap.data;
-                            chMethodController.text = allWordsCapitilize(
-                                accomodation.checkingMethod
-                                    .replaceAll(RegExp('_'), ' '));
+                            chMethodController.text =
+                                accomodation.checkingMethod != ""
+                                    ? allWordsCapitilize(accomodation
+                                        .checkingMethod
+                                        .replaceAll(RegExp('_'), ' '))
+                                    : '';
                             chInFrMethodController.text =
                                 accomodation.accessInstructionFr.data;
                             chInEnMethodController.text =
@@ -588,15 +591,19 @@ showAccommodation(context, accomodation) {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 children: <Widget>[
-                                  Row(
-                                    children: <Widget>[
-                                      methods.elementCheck("Check-in Method",
-                                          chMethodController, context),
-                                      const SizedBox(
-                                        height: 10,
-                                      )
-                                    ],
-                                  ),
+                                  accomodation.checkingMethod != ""
+                                      ? Row(
+                                          children: <Widget>[
+                                            methods.elementCheck(
+                                                "Check-in Method",
+                                                chMethodController,
+                                                context),
+                                            const SizedBox(
+                                              height: 10,
+                                            )
+                                          ],
+                                        )
+                                      : const Text(""),
                                   Row(
                                     children: <Widget>[
                                       methods.elementCheck(

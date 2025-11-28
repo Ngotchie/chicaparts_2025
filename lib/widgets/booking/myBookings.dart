@@ -356,7 +356,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                             ),
                                           ),
                                         ),
-                                        value: propertyValue,
+                                        initialValue: propertyValue,
                                         items: properties
                                             .map<DropdownMenuItem<int>>((item) {
                                           return DropdownMenuItem(
@@ -526,7 +526,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                             ),
                                           ),
                                         ),
-                                        value: statusValue,
+                                        initialValue: statusValue,
                                         items: listStatus
                                             .map<DropdownMenuItem<String>>(
                                                 (String value) {
@@ -880,7 +880,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                         ),
                                       ),
                                     ),
-                                    value: propertyValue,
+                                    initialValue: propertyValue,
                                     items: properties
                                         .map<DropdownMenuItem<int>>((item) {
                                       return DropdownMenuItem(
@@ -1032,7 +1032,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                         ),
                                       ),
                                     ),
-                                    value: statusValue,
+                                    initialValue: statusValue,
                                     onChanged: (String? newValue) {
                                       setState(() {
                                         statusValue = newValue!;
@@ -1358,7 +1358,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                         ),
                                       ),
                                     ),
-                                    value: countryValue,
+                                    initialValue: countryValue,
                                     items: countries
                                         .map<DropdownMenuItem<String>>((item) {
                                       return DropdownMenuItem(
@@ -1532,7 +1532,7 @@ class _MyBookingWidgetState extends State<MyBookingWidget> {
                                         ),
                                       ),
                                     ),
-                                    value: currencyValue,
+                                    initialValue: currencyValue,
                                     items: currencies
                                         .map<DropdownMenuItem<int>>((item) {
                                       return DropdownMenuItem(

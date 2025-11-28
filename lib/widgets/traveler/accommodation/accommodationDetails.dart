@@ -1,12 +1,10 @@
 import 'dart:convert';
 
 import 'package:chicaparts_partner/api/traveler/api_accommodation_traveler.dart';
-import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/favorite_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/services/favorite_repository.dart';
 import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/selectBookingDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/equipments.dart';
@@ -15,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:provider/provider.dart';

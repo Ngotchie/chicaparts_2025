@@ -62,7 +62,7 @@ class _AllPopularStaysPageState extends State<AllPopularStaysPage> {
         child: Column(
           children: [
             // 🔝 Barre de navigation avec bouton retour et titre
-            Container(
+            SizedBox(
               height: 50,
               child: Padding(
                 padding:

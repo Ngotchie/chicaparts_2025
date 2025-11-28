@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:chicaparts_partner/widgets/traveler/book/payment_logic.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/selectBookingDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/billingInfos.dart';
 

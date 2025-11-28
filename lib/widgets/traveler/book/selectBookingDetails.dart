@@ -73,7 +73,8 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
 
             // 🔹 Sélection des voyageurs (design compact)
             Text("👥 ${lang.t('travelers')}",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -93,7 +94,7 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Color(0xFF244B6B),
+                  color: const Color(0xFF244B6B),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

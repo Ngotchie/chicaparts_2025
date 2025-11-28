@@ -42,7 +42,7 @@ PreferredSizeWidget? appBar(title, context, position) {
             prefs.remove('email');
             prefs.remove('token');
             Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (_) => LoginPage()));
+                context, MaterialPageRoute(builder: (_) => const LoginPage()));
           }
         },
       ),

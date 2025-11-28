@@ -331,7 +331,7 @@ class _HomePageState extends State<HomePage> {
                           Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => DestinationsPage(),
+                                builder: (_) => const DestinationsPage(),
                               ));
                         },
                         child: Text(lang.t("show_all")),
@@ -372,7 +372,7 @@ class _HomePageState extends State<HomePage> {
                           Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => AllPopularStaysPage(),
+                                builder: (_) => const AllPopularStaysPage(),
                               ));
                         },
                         child: Text(lang.t("show_all")),
@@ -425,11 +425,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   void openFilterModal() {
-    final Color primaryBlue = const Color(0xFF244B6B);
-    final Color accentOrange = const Color(0xFFF37540);
-    final Color yellow = const Color(0xFFFBD107);
-    final Color turquoise = const Color(0xFF05A8CF);
-    final Color vert = const Color(0xFF54bf31);
+    const Color primaryBlue = Color(0xFF244B6B);
+    const Color accentOrange = Color(0xFFF37540);
+    const Color yellow = Color(0xFFFBD107);
+    const Color turquoise = Color(0xFF05A8CF);
+    const Color vert = Color(0xFF54bf31);
 
     showModalBottomSheet(
       context: context,
@@ -831,7 +831,7 @@ class _HomePageState extends State<HomePage> {
                                               : Icons.favorite,
                                           color: Colors.white,
                                         ),
-                                        SizedBox(width: 10),
+                                        const SizedBox(width: 10),
                                         Text(
                                           isFav
                                               ? lang.t("favorite_remove")

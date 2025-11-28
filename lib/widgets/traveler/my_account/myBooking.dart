@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
 import 'package:chicaparts_partner/models/model_booking.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -16,10 +17,12 @@ class MyReservationsPage extends StatefulWidget {
 }
 
 class _MyReservationsPageState extends State<MyReservationsPage> {
-  Map<String, dynamic>? pendingReservation;
-  late Future<List<Booking>> futureBookings;
   User? user;
+
   ApiBooking apiResa = ApiBooking();
+
+  late Future<List<Booking>> _allBookings;
+  Booking? _currentReservation;
 
   @override
   void initState() {
@@ -27,88 +30,232 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     loadUserAndReservations();
   }
 
+  // -----------------------------------------------------------------------------
+  // 🔹 CHARGEMENT UTILISATEUR + RÉSERVATIONS
+  // -----------------------------------------------------------------------------
   Future<void> loadUserAndReservations() async {
     final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString('reservation_data');
     final userJson = prefs.getString('user');
 
-    if (json != null) {
-      setState(() {
-        pendingReservation = jsonDecode(json);
-      });
-    }
+    if (userJson != null && userJson.isNotEmpty) {
+      user = User.fromJson(jsonDecode(userJson));
 
-    if (userJson != null) {
-      final currentUser = User.fromJson(jsonDecode(userJson));
-      user = currentUser;
       setState(() {
-        futureBookings = apiResa.getUserReservations(currentUser);
+        _allBookings = _fetchAllBookings();
       });
     }
   }
 
-  Future<void> clearLocalReservation() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('reservation_data');
-    setState(() => pendingReservation = null);
+  // -----------------------------------------------------------------------------
+  // 🔹 Récupère toutes les réservations + détecte la réservation en cours
+  // -----------------------------------------------------------------------------
+  Future<List<Booking>> _fetchAllBookings() async {
+    if (user == null) return [];
+
+    final list = await apiResa.getUserReservations(user!);
+
+    // Tri descendant par date de création
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a.bookedAt ?? '') ?? DateTime(2000);
+      final db = DateTime.tryParse(b.bookedAt ?? '') ?? DateTime(2000);
+      return db.compareTo(da);
+    });
+
+    // Détecter la réservation en cours
+    _detectCurrentReservation(list);
+
+    return list;
   }
 
+  // -----------------------------------------------------------------------------
+  // 🔹 Détection automatique de la réservation en cours
+  // -----------------------------------------------------------------------------
+  void _detectCurrentReservation(List<Booking> all) {
+    final now = DateTime.now();
+
+    for (var b in all) {
+      final start = DateTime.tryParse(b.firstNight ?? '');
+      final end = DateTime.tryParse(b.lastNight ?? '');
+
+      if (start != null && end != null) {
+        if (now.isAfter(start) &&
+            now.isBefore(end.add(const Duration(days: 1)))) {
+          setState(() => _currentReservation = b);
+          return;
+        }
+      }
+    }
+
+    // Sinon aucune en cours
+    setState(() => _currentReservation = null);
+  }
+
+  // -----------------------------------------------------------------------------
+  // 🔹 Refresh global
+  // -----------------------------------------------------------------------------
+  Future<void> _loadAllBookings() async {
+    setState(() {
+      _allBookings = _fetchAllBookings();
+    });
+  }
+
+  // -----------------------------------------------------------------------------
+  // 🔹 Changer les dates (TODO ou navigation)
+  // -----------------------------------------------------------------------------
+  void _changeDates(Booking b) {
+    // TODO : ouvrir un date picker / nouvelle page
+    print("Changer les dates de : ${b.id}");
+  }
+
+  // -----------------------------------------------------------------------------
+  // 🔹 BUILD
+  // -----------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 16.0, bottom: 12),
-          child: Column(
-            children: [
-              _buildHeader(),
-              if (pendingReservation != null) ...[
-                _buildPendingCard(pendingReservation!),
-                const SizedBox(height: 20),
-              ],
-              Expanded(
-                child: user == null
-                    ? Center(child: Text(lang.t('booking_connect_text')))
-                    : FutureBuilder<List<Booking>>(
-                        future: futureBookings,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          } else if (snapshot.hasError) {
-                            return Center(
-                                child: Text(
-                                    "${lang.t('error')}: ${lang.t('error_network')}"));
-                          } else if (snapshot.data == null ||
-                              snapshot.data!.isEmpty) {
-                            return Center(child: Text(lang.t('booking_empty')));
-                          }
-                          final bookings = snapshot.data!;
-                          return ListView.separated(
-                            itemCount: bookings.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              return _buildBookingCard(bookings[index]);
+        child: Column(
+          children: [
+            _buildHeader(),
+            Container(height: 1, color: Colors.grey[300]),
+            Expanded(
+              child: user == null
+                  ? Center(child: Text(lang.t('booking_connect_text')))
+                  : RefreshIndicator(
+                      onRefresh: _loadAllBookings,
+                      child: CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          // ------------------------------------------------------------------
+                          // 🔥 RÉSERVATION EN COURS (grosse carte)
+                          // ------------------------------------------------------------------
+                          if (_currentReservation != null)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                child: ReservationInProgressCard(
+                                  title:
+                                      _currentReservation!.accommodation ?? "—",
+                                  city: _currentReservation!.city ?? "",
+                                  firstNight: DateTime.parse(
+                                      _currentReservation!.firstNight),
+                                  lastNight: DateTime.parse(
+                                      _currentReservation!.lastNight),
+                                  currency: _currentReservation!.currency,
+                                  totalAmount: _currentReservation!.price ?? 0,
+                                  travelers: (_currentReservation!.adult ?? 1) +
+                                      (_currentReservation!.child ?? 0),
+                                  paymentStatus:
+                                      _currentReservation!.validationStatus,
+                                  statusLabel:
+                                      _currentReservation!.validationStatus ==
+                                              "confirmed"
+                                          ? lang.t('confirmed')
+                                          : lang.t('waitting'),
+                                  imageUrl: _currentReservation!.img,
+                                  onChangeDates: () =>
+                                      _changeDates(_currentReservation!),
+                                  onTip: () => Navigator.pushNamed(context,
+                                      '/tips/${_currentReservation!.id}'),
+                                  onMore: () => Navigator.pushNamed(
+                                    context,
+                                    '/reservations/${_currentReservation!.id}',
+                                  ),
+                                  onReview: () {},
+                                ),
+                              ),
+                            ),
+
+                          // ------------------------------------------------------------------
+                          // 🔹 CHARGEMENT / ERREUR / LISTE
+                          // ------------------------------------------------------------------
+                          FutureBuilder<List<Booking>>(
+                            future: _allBookings,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                );
+                              }
+
+                              if (snapshot.hasError) {
+                                return SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Center(
+                                    child: Text(
+                                      "${lang.t('error')}: ${lang.t('error_network')}",
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final bookings = snapshot.data ?? [];
+
+                              // Retirer la réservation en cours
+                              final list = bookings.where((b) {
+                                if (_currentReservation == null) return true;
+                                return b.id != _currentReservation!.id;
+                              }).toList();
+
+                              if (list.isEmpty) {
+                                return SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Center(
+                                    child: Text(lang.t('no_booking')),
+                                  ),
+                                );
+                              }
+
+                              return SliverList.builder(
+                                itemCount: list.length,
+                                itemBuilder: (_, i) {
+                                  final b = list[i];
+                                  final first = DateTime.parse(b.firstNight);
+                                  final last = DateTime.parse(b.lastNight);
+
+                                  return BookingTile(
+                                    title: b.accommodation,
+                                    city: b.city,
+                                    dates:
+                                        "${DateFormat('dd MMM').format(first)} – ${DateFormat('dd MMM yyyy').format(last)}",
+                                    status: b.validationStatus,
+                                    imageUrl: b.img,
+                                    onTap: () => Navigator.pushNamed(
+                                      context,
+                                      '/reservations/${b.id}',
+                                    ),
+                                  );
+                                },
+                              );
                             },
-                          );
-                        },
+                          ),
+
+                          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                        ],
                       ),
-              ),
-            ],
-          ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // -----------------------------------------------------------------------------
+  // 🔹 HEADER
+  // -----------------------------------------------------------------------------
   Widget _buildHeader() {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 12),
+      padding: const EdgeInsets.only(top: 16.0, bottom: 12, right: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -124,7 +271,7 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
                 children: [
                   Text(
                     "📑 ${lang.t('my_bookings')}",
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF244B6B)),
@@ -136,83 +283,30 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
               ),
             ],
           ),
-          const Icon(Icons.settings, size: 28, color: Color(0xFF244B6B)),
+          IconButton(
+            icon: const Icon(Icons.sync, size: 28, color: Color(0xFF244B6B)),
+            onPressed: () => showSyncReservationsSheet(context, apiResa, user!),
+          )
         ],
       ),
     );
   }
 
-  Widget _buildPendingCard(Map<String, dynamic> res) {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
-    return Card(
-      color: Colors.yellow[100],
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Colors.orange),
+  void showSyncReservationsSheet(
+    BuildContext context,
+    ApiBooking api,
+    User user,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("📌 ${lang.t('new_bookings')}",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text("🛏️ ${lang.t('accommodation')} : ${res['propId'] ?? 'N/A'}"),
-            Text(
-                "📅 ${lang.t('from')} ${_formatDate(DateTime.parse(res['firstNight']))} au ${_formatDate(DateTime.parse(res['lastNight']).add(const Duration(days: 1)))}"),
-            Text("👤 ${res['guestFirstName']} ${res['guestName']}"),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF244B6B)),
-                  onPressed: () =>
-                      Navigator.pushNamed(context, "/resume-reservation"),
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(lang.t('continue'),
-                      style: TextStyle(color: Colors.white)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: clearLocalReservation,
-                  tooltip: lang.t('delete_booking'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        return SyncReservationsWidget(api: api, user: user);
+      },
     );
   }
-
-  Widget _buildBookingCard(Booking booking) {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("🏠 ${booking.accommodation}",
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(
-                "📅 ${lang.t('from')} ${_formatDate(DateTime.parse(booking.firstNight))} ${lang.t('to')} ${_formatDate(DateTime.parse(booking.lastNight).add(const Duration(days: 1)))}"),
-            Text("👤 ${booking.guestFirstName} ${booking.guestName}"),
-            Text("💰 ${booking.price} ${booking.currency}"),
-            const SizedBox(height: 8),
-            Text("📌 ${lang.t('status')}: ${booking.validationStatus}"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) => DateFormat("dd MMM yyyy").format(date);
 }

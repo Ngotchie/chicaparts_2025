@@ -60,8 +60,8 @@ class _BookingIndexWidgetState extends State<BookingIndexWidget> {
                       await SharedPreferences.getInstance();
                   prefs.remove('user');
                   prefs.remove('email');
-                  Navigator.pushReplacement(
-                      context, MaterialPageRoute(builder: (_) => LoginPage()));
+                  Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()));
                 }
               },
             ),

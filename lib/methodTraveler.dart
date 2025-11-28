@@ -222,7 +222,7 @@ class MethodsTraveler {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF244B6B),
+              backgroundColor: const Color(0xFF244B6B),
             ),
             child: Text(
               lang.t("login"),

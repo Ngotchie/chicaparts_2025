@@ -1,240 +1,256 @@
 import 'dart:convert';
-
 import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
 import 'package:chicaparts_partner/models/traveler/modele_booking_traveler.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/services/api.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/editProfile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
-import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
-
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
   late Future<UserProfile> _futureProfile;
-  bool _isSaving = false;
+  final ApiBooking api = ApiBooking();
 
   @override
   void initState() {
     super.initState();
-    _futureProfile = fetchUserProfile();
+    _futureProfile = _fetch();
   }
 
-  ApiBooking apiBooking = ApiBooking();
-  Future<UserProfile> fetchUserProfile() async {
+  Future<UserProfile> _fetch() async {
     final prefs = await SharedPreferences.getInstance();
-
-    final userJson = prefs.getString('user');
-    final currentUser = User.fromJson(jsonDecode(userJson!));
-
-    User user = currentUser;
-    return await apiBooking.fetchUserProfile(user);
+    final raw = prefs.getString('user');
+    final currentUser = User.fromJson(jsonDecode(raw!));
+    return api.fetchUserProfile(currentUser);
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text("👤 ${lang.t('my_profile')}"),
-        backgroundColor: Colors.white,
-      ),
-      body: FutureBuilder<UserProfile>(
-          future: _futureProfile,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                  child:
-                      Text("${lang.t('error')} : ${lang.t('error_network')}"));
-            } else {
-              final user = snapshot.data!;
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundImage: AssetImage('assets/images/avatar.png'),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "${user.firstName} ${user.lastName}",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 30),
-                  _buildProfileItem(
-                      Icons.book, lang.t('bookings'), "${user.bookingCount}"),
-                  _buildProfileItem(
-                      Icons.reviews, lang.t('review'), "${user.reviewCount}"),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 🔵 HEADER UNIFORME
+            _buildHeader(context, "👤 ${lang.t('my_profile')}"),
 
-                  _buildProfileItem(
-                      Icons.badge, lang.t('first_name'), user.firstName),
-                  _buildProfileItem(
-                      Icons.badge_outlined, lang.t('last_name'), user.lastName),
-                  _buildProfileItem(Icons.female, lang.t('gender'),
-                      user.gender == 'm' ? lang.t('male') : lang.t('female')),
-                  _buildProfileItem(
-                      Icons.location_city, lang.t('city'), user.city),
-                  _buildProfileItem(
-                      Icons.location_pin, lang.t('zip'), user.zipCode ?? '-'),
-                  _buildProfileItem(
-                      Icons.map, lang.t('state'), user.state ?? '-'),
-                  _buildProfileItem(Icons.email, "Email", user.email),
-                  _buildProfileItem(Icons.phone, lang.t('phone'), user.phone),
+            // ligne séparatrice
+            Container(height: 1, color: Colors.grey[300]),
 
-                  const SizedBox(height: 20),
+            // -------------------------------
+            //        CONTENU SCROLLABLE
+            // -------------------------------
+            Expanded(
+              child: FutureBuilder<UserProfile>(
+                future: _futureProfile,
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError || !snap.hasData) {
+                    return Center(
+                      child: Text(
+                          "${lang.t('error')} : ${lang.t('error_network')}"),
+                    );
+                  }
 
-                  /// ✏️ Modifier
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final updated = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditProfilePage(user: snapshot.data!),
-                        ),
-                      );
+                  final u = snap.data!;
 
-                      if (updated == true) {
-                        setState(() {
-                          _futureProfile = fetchUserProfile(); // 🔁 rafraîchir
-                        });
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.edit,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      lang.t('edit_profile'),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF244B6B),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    children: [
+                      _SectionTitle(lang.t('personal_infos')),
+                      _InfoRow(
+                          icon: Icons.badge_outlined,
+                          label: lang.t('first_name'),
+                          value: u.firstName),
+                      _InfoRow(
+                          icon: Icons.badge,
+                          label: lang.t('last_name'),
+                          value: u.lastName),
+                      _InfoRow(
+                        icon: Icons.wc_outlined,
+                        label: lang.t('gender'),
+                        value: (u.gender == 'm')
+                            ? lang.t('male')
+                            : lang.t('female'),
                       ),
-                    ),
-                  ),
+                      const _DividerThin(),
+                      _SectionTitle(lang.t('contact')),
+                      _ActionRow(
+                        icon: Icons.email_outlined,
+                        label: "Email",
+                        value: u.email,
+                        onTap: () => _open(Uri.parse('mailto:${u.email}')),
+                        trailingIcon: Icons.open_in_new,
+                      ),
+                      _ActionRow(
+                        icon: Icons.call_outlined,
+                        label: lang.t('phone'),
+                        value: u.phone,
+                        onTap: () => _open(Uri.parse('tel:${u.phone}')),
+                        trailingIcon: Icons.phone_forwarded,
+                      ),
+                      const _DividerThin(),
+                      _SectionTitle(lang.t('address')),
+                      _InfoRow(
+                          icon: Icons.location_city_outlined,
+                          label: lang.t('city'),
+                          value: u.city),
+                      _InfoRow(
+                          icon: Icons.local_activity_outlined,
+                          label: lang.t('state'),
+                          value: u.state ?? '—'),
+                      _InfoRow(
+                          icon: Icons.map_outlined,
+                          label: lang.t('zip'),
+                          value: u.zipCode ?? '—'),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
 
-                  const SizedBox(height: 20),
-
-                  /// ❌ Supprimer
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _confirmDelete(context);
-                    },
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    label: Text(
-                      lang.t('delete_profile'),
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ],
+      // ---------------------------------------------------------
+      //                BOUTON "Éditer le profil"
+      // ---------------------------------------------------------
+      floatingActionButton: FutureBuilder<UserProfile>(
+        future: _futureProfile,
+        builder: (context, snap) {
+          if (!snap.hasData) return const SizedBox.shrink();
+          return FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF244B6B),
+            icon: const Icon(Icons.edit, color: Colors.white),
+            label: Text(lang.t('edit_profile'),
+                style: const TextStyle(color: Colors.white)),
+            onPressed: () async {
+              final updated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => EditProfilePage(user: snap.data!)),
               );
-            }
-          }),
-    );
-  }
-
-  Widget _buildProfileItem(IconData icon, String label, String value) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 6),
-      leading: Icon(icon, color: Colors.blueAccent),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(value),
-    );
-  }
-
-  void _confirmDelete(BuildContext context) {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text("❗️${lang.t('confirm')}"),
-        content: Text(lang.t('delete_account_message')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(lang.t('cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteAccount();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(lang.t('profile_deleted'))),
-              );
-              // Rediriger ou fermer la session
+              if (updated == true) setState(() => _futureProfile = _fetch());
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(lang.t('delete')),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 🔵 HEADER UNIFORME (comme les autres pages)
+  Widget _buildHeader(BuildContext context, String title) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      color: Colors.white,
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                size: 20, color: Color(0xFF244B6B)),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF244B6B),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _deleteAccount() async {
-    setState(() => _isSaving = true);
-
-    try {
-      ApiUrl url = ApiUrl();
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString('user');
-      final currentUser = User.fromJson(jsonDecode(userJson!));
-
-      final response = await http.delete(
-        Uri.parse('${url.getChicapartsUrl()}auth/me?user_id=${currentUser.id}'),
-        headers: {
-          'Accept': 'application/json',
-          'X-Authorization': url.getKey(),
-        },
-      );
-
-      if (response.statusCode == 200) {
-        await prefs.clear(); // 🔐 Déconnecte l'utilisateur
-        if (!mounted) return;
-        Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
-      } else {
-        final msg = jsonDecode(response.body)['error'] ?? 'Unknow Error';
-        _showError(context, msg.toString());
-      }
-    } catch (e) {
-      _showError(context, "Network error : $e");
-    } finally {
-      setState(() => _isSaving = false);
+  Future<void> _open(Uri uri) async {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+}
 
-  void _showError(BuildContext context, String message) {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(lang.t('error')),
-        content: Text(message),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(lang.t('close')))
-        ],
-      ),
+/// ====== UI Helpers ======
+
+class _SectionTitle extends StatelessWidget {
+  final String text;
+  const _SectionTitle(this.text);
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 6),
+      child: Text(text,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+class _DividerThin extends StatelessWidget {
+  const _DividerThin();
+  @override
+  Widget build(BuildContext context) {
+    return Divider(height: 20, thickness: 0.6, color: Colors.grey.shade300);
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      leading: Icon(icon, color: const Color(0xFF244B6B)),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  final IconData? trailingIcon;
+
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.trailingIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      leading: Icon(icon, color: const Color(0xFF244B6B)),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(value),
+      trailing: trailingIcon != null
+          ? Icon(trailingIcon, size: 18, color: Colors.grey[600])
+          : null,
+      onTap: onTap,
     );
   }
 }

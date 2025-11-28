@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 class FavoriteRepository {
-  static String _localKey = 'local_favorites';
+  static final String _localKey = 'local_favorites';
   static ApiUrl url = ApiUrl();
 
   /// 🔄 Récupère les favoris selon mode
