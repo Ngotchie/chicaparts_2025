@@ -567,12 +567,25 @@ class QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const paddingH = 16.0;
+    const spacing = 12.0;
+
+    final w = MediaQuery.sizeOf(context).width;
+
+    // Ajuste le seuil si tu veux
+    final columns = w < 420 ? 2 : 4;
+
+    // Largeur dispo = largeur écran - padding gauche/droite - espacements entre colonnes
+    final itemWidth = (w - (paddingH * 2) - (spacing * (columns - 1))) / columns;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(paddingH, 8, paddingH, 8),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: actions.map((a) => _QuickCard(a)).toList(),
+        spacing: spacing,
+        runSpacing: spacing,
+        children: actions
+            .map((a) => SizedBox(width: itemWidth, child: _QuickCard(a)))
+            .toList(),
       ),
     );
   }
