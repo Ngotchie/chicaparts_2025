@@ -17,6 +17,7 @@ class SelectBookingDetailsPage extends StatefulWidget {
   final double cleaningFees;
   final int roomId;
   final int propId;
+  final int capacity;
 
   const SelectBookingDetailsPage(
       {super.key,
@@ -25,7 +26,8 @@ class SelectBookingDetailsPage extends StatefulWidget {
       required this.currency,
       required this.cleaningFees,
       required this.roomId,
-      required this.propId});
+      required this.propId,
+      required this.capacity});
 
   @override
   _SelectBookingDetailsPageState createState() =>
@@ -43,6 +45,9 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
   List<DateTime> availableDates = [];
   Map<DateTime, double> availablePrices = {};
   bool _isLoading = true;
+
+  int get _totalTravelers => _adults + _children; // + _infants si besoin
+  int get _remainingCapacity => widget.capacity - _totalTravelers;
 
   String displayPrice = "";
   var exchangeRates;
@@ -79,11 +84,19 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildTravelerSelector(lang.t('adults'), _adults,
-                    (value) => setState(() => _adults = value)),
+                _buildTravelerSelector(
+                  lang.t('adults'),
+                  _adults,
+                  (value) => setState(() => _adults = value),
+                  max: widget.capacity - _children,
+                ),
                 const SizedBox(width: 5),
-                _buildTravelerSelector(lang.t('children'), _children,
-                    (value) => setState(() => _children = value)),
+                _buildTravelerSelector(
+                  lang.t('children'),
+                  _children,
+                  (value) => setState(() => _children = value),
+                  max: widget.capacity - _adults,
+                ),
               ],
             ),
 
@@ -302,9 +315,15 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
 
   // 👥 **Sélecteur de voyageurs compact**
   Widget _buildTravelerSelector(
-      String label, int value, Function(int) onChanged) {
+    String label,
+    int value,
+    Function(int) onChanged, {
+    required int max,
+  }) {
+    final bool canDecrement = value > 0;
+    final bool canIncrement = value < max;
+
     return Expanded(
-      // Permet à ce widget de s'adapter automatiquement à la largeur disponible
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -323,14 +342,16 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.remove_circle_outline,
-                      color: Color(0xFF244B6B)),
-                  onPressed: () {
-                    if (value > 0) {
-                      onChanged(value - 1);
-                      _updateTotalPrice();
-                    }
-                  },
+                  icon: const Icon(
+                    Icons.remove_circle_outline,
+                    color: Color(0xFF244B6B),
+                  ),
+                  onPressed: canDecrement
+                      ? () {
+                          onChanged(value - 1);
+                          _updateTotalPrice();
+                        }
+                      : null,
                 ),
                 Text(
                   value.toString(),
@@ -338,15 +359,26 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
                       fontSize: 14, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline,
-                      color: Color(0xFF244B6B)),
-                  onPressed: () {
-                    onChanged(value + 1);
-                    _updateTotalPrice();
-                  },
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: Color(0xFF244B6B),
+                  ),
+                  onPressed: canIncrement
+                      ? () {
+                          onChanged(value + 1);
+                          _updateTotalPrice();
+                        }
+                      : null,
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 6),
+
+          // Petit hint UX (facultatif mais utile)
+          Text(
+            "Capacité : ${widget.capacity} • Restant : ${_remainingCapacity < 0 ? 0 : _remainingCapacity}",
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
       ),

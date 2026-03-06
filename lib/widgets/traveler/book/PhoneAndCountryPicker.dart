@@ -73,7 +73,7 @@ class _PhoneAndCountryPickerState extends State<PhoneAndCountryPicker> {
                   )
                 else
                   const Text(
-                    "🌍 +..",
+                    "🌍 ",
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),

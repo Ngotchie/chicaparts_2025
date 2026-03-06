@@ -466,15 +466,19 @@ class _AccommodationDetailsState extends State<AccommodationDetails> {
                                         MaterialPageRoute(
                                           builder: (context) =>
                                               SelectBookingDetailsPage(
-                                            idAcc: accommodation!["id"],
-                                            roomId: accommodation!["roomId"],
-                                            propId: accommodation!["propId"],
-                                            pricePerNight: widget.dayPrice,
-                                            currency: widget.currency,
-                                            cleaningFees: (accommodation![
-                                                    "cleaning_fees"])
-                                                .toDouble(),
-                                          ),
+                                                  idAcc: accommodation!["id"],
+                                                  roomId:
+                                                      accommodation!["roomId"],
+                                                  propId:
+                                                      accommodation!["propId"],
+                                                  pricePerNight:
+                                                      widget.dayPrice,
+                                                  currency: widget.currency,
+                                                  cleaningFees: (accommodation![
+                                                          "cleaning_fees"])
+                                                      .toDouble(),
+                                                  capacity: accommodation![
+                                                      "capacity"]),
                                         ));
                                   },
                                   style: ElevatedButton.styleFrom(
