@@ -357,7 +357,7 @@ class LoginPageState extends State<LoginPage> {
   /// Login PARTENAIRE (Season)
   Future<User?> _loginPartner(String email, String pass) async {
     final url = ApiUrl();
-    final apiUrl = url.getApiUrl(); // ex: https://season.api/...
+    final apiUrl = url.getApiUrl();
     final apiKey = url.getKey();
 
     final client = RetryClient(http.Client());

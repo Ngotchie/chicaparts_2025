@@ -7,6 +7,7 @@ import 'package:chicaparts_partner/widgets/traveler/my_account/myBooking.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/my_reviews_page.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/profile.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/setting.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/transaction.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,7 @@ import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/favorite_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/providers/theme_provider.dart';
 
 // WIDGETS / ROUTES
 import 'package:chicaparts_partner/widgets/login/login.dart';
@@ -64,6 +66,7 @@ void main() async {
   final currencyProvider = CurrencyProvider();
   final exchangeProvider = ExchangeRateProvider();
   final favoriteProvider = FavoriteProvider();
+  final themeProvider = ThemeProvider();
 
   // 4) Style barre système
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -79,6 +82,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => currencyProvider),
         ChangeNotifierProvider(create: (_) => exchangeProvider),
         ChangeNotifierProvider(create: (_) => favoriteProvider),
+        ChangeNotifierProvider(create: (_) => themeProvider),
       ],
       child: MyApp(initialUser: user),
     ),
@@ -91,9 +95,17 @@ void main() async {
       await langProvider.initLanguage();
       await currencyProvider.initCurrency();
       await exchangeProvider.loadRates();
-      await favoriteProvider.loadFavorites(isGuest: false, user: user!);
-    } catch (_) {
+      await themeProvider.initTheme();
+      if (user != null) {
+        await favoriteProvider.loadFavorites(
+          isGuest: false,
+          user: user,
+        );
+      }
+    } catch (e, s) {
       // silencieux pour ne pas bloquer l'UX ; journaliser si besoin
+      debugPrint('Startup error: $e');
+      debugPrint('$s');
     }
   });
   //}
@@ -105,16 +117,28 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor:
+            isDarkMode ? const Color(0xFF111827) : Colors.white,
+        systemNavigationBarIconBrightness:
+            isDarkMode ? Brightness.light : Brightness.dark,
+      ),
+    );
+
     return MaterialApp(
       title: 'Chicaparts',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: _kPrimary,
-          secondary: _kSecondary,
-        ),
-        fontFamily: 'Montserrat',
-      ),
+      theme: _buildLightTheme(),
+      darkTheme: _buildDarkTheme(),
+      themeMode: themeProvider.themeMode,
       // On garde le système de routes + Splash en route initiale
       initialRoute: '/',
       routes: {
@@ -132,6 +156,7 @@ class MyApp extends StatelessWidget {
         '/account/profile': (_) => const ProfilePage(),
         '/reservations': (_) => const MyReservationsPage(),
         '/favorites': (_) => const BottomMenuTraveler(index: 2, results: []),
+        '/account/transactions': (_) => const TransactionPage()
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';
@@ -147,20 +172,22 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        //accommodation/<id>
-        if (uri.pathSegments.length == 2 &&
-            uri.pathSegments[0] == 'accommodation') {
-          final id = uri.pathSegments[1];
-          final currency = uri.pathSegments[2];
-          final price = uri.pathSegments[1];
-          return MaterialPageRoute(
-            builder: (_) => AccommodationDetails(
-              accommodationId: id as int,
-              currency: currency,
-              dayPrice: price as double,
-            ),
-            settings: settings,
-          );
+        // /acc/<id>/<currency>/<price>
+        if (uri.pathSegments.length == 4 && uri.pathSegments[0] == 'acc') {
+          final int? id = int.tryParse(uri.pathSegments[1]);
+          final String currency = Uri.decodeComponent(uri.pathSegments[2]);
+          final double? price = double.tryParse(uri.pathSegments[3]);
+
+          if (id != null && price != null) {
+            return MaterialPageRoute(
+              builder: (_) => AccommodationDetails(
+                accommodationId: id,
+                currency: currency,
+                dayPrice: price,
+              ),
+              settings: settings,
+            );
+          }
         }
 
         if (name == '/avis') {
@@ -169,7 +196,13 @@ class MyApp extends StatelessWidget {
             settings: settings,
           );
         }
-        return null; // laisser Flutter gérer les autres
+
+        return MaterialPageRoute(
+          builder: (_) => const Scaffold(
+            body: Center(child: Text('Route non trouvée')),
+          ),
+          settings: settings,
+        );
       },
     );
   }
@@ -204,6 +237,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _goNext() {
+    if (!mounted) return;
+
     final user = widget.initialUser;
 
     // Choix de la page selon le type d'utilisateur
@@ -237,7 +272,7 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     // Splash simple (image + fond) avec un petit fade-in
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: FadeTransition(
           opacity: _fade,
@@ -250,4 +285,84 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
+}
+
+ThemeData _buildLightTheme() {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: _kPrimary,
+    primary: _kPrimary,
+    secondary: _kSecondary,
+    brightness: Brightness.light,
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Montserrat',
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: const Color(0xFFF6F8FB),
+    canvasColor: Colors.white,
+    dividerColor: const Color(0xFFE2E8F0),
+    cardColor: Colors.white,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: _kPrimary,
+      elevation: 0,
+      centerTitle: false,
+    ),
+    listTileTheme: const ListTileThemeData(iconColor: _kPrimary),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? _kPrimary
+            : Colors.white,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? _kPrimary.withValues(alpha: 0.45)
+            : const Color(0xFFCBD5E1),
+      ),
+    ),
+  );
+}
+
+ThemeData _buildDarkTheme() {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: _kPrimary,
+    primary: const Color(0xFF8AB4D6),
+    secondary: _kSecondary,
+    brightness: Brightness.dark,
+    surface: const Color(0xFF111827),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Montserrat',
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: const Color(0xFF0B1220),
+    canvasColor: const Color(0xFF111827),
+    dividerColor: const Color(0xFF243041),
+    cardColor: const Color(0xFF111827),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: false,
+    ),
+    listTileTheme: const ListTileThemeData(
+      iconColor: Color(0xFF8AB4D6),
+      textColor: Colors.white,
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? const Color(0xFF8AB4D6)
+            : const Color(0xFFE5E7EB),
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? const Color(0xFF8AB4D6).withValues(alpha: 0.45)
+            : const Color(0xFF334155),
+      ),
+    ),
+  );
 }

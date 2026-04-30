@@ -429,6 +429,8 @@ class StatusChip extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pending':
         return const Color(0xFFEDE7FE);
+      case 'expired':
+        return const Color(0xFFFFF1E0);
       case 'confirmed':
         return const Color(0xFFE7F7EF);
       case 'cancelled':
@@ -442,6 +444,8 @@ class StatusChip extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'pending':
         return const Color(0xFF6C3CF0);
+      case 'expired':
+        return const Color(0xFFB26A00);
       case 'confirmed':
         return const Color(0xFF1B8E4B);
       case 'cancelled':
@@ -454,7 +458,10 @@ class StatusChip extends StatelessWidget {
   String _label(lang) {
     switch (status.toLowerCase()) {
       case 'pending':
+      case 'waiting':
         return lang.t('waitting');
+      case 'expired':
+        return lang.t('expired');
       case 'confirmed':
         return lang.t('confirmed');
       case 'cancelled':

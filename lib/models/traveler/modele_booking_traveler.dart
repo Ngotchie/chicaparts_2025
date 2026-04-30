@@ -82,26 +82,27 @@ class UserProfile {
   }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    final stats = (json['_stats'] is Map) ? json['_stats'] as Map : const {};
+    final stats = (json['stats'] is Map) ? json['stats'] as Map : const {};
     // gérer les deux orthographes favorites/favourites
-    final favRaw = json['favourites_hostings'] ?? json['favorites_hostings'];
+    final favRaw = json['user']['favourites_hostings'] ??
+        json['user']['favorites_hostings'];
     final favList = _asStringList(favRaw);
 
     return UserProfile(
-      firstName: (json['first_name'] ?? '').toString(),
-      lastName: (json['last_name'] ?? '').toString(),
-      gender: (json['gender'] ?? '').toString(),
-      email: (json['email'] ?? '').toString(),
-      phone: (json['mobile_phone_number'] ?? '').toString(),
-      city: (json['city'] ?? '').toString(),
-      state: (json['state'] as String?),
-      zipCode: (json['postcode'] as String?),
+      firstName: (json['user']['first_name'] ?? '').toString(),
+      lastName: (json['user']['last_name'] ?? '').toString(),
+      gender: (json['user']['gender'] ?? '').toString(),
+      email: (json['user']['email'] ?? '').toString(),
+      phone: (json['user']['mobile_phone_number'] ?? '').toString(),
+      city: (json['user']['city'] ?? '').toString(),
+      state: (json['user']['state'] as String?),
+      zipCode: (json['user']['postcode'] as String?),
       bookingCount: _asInt(stats['bookings']),
       reviewCount: _asInt(stats['reviews']),
       favorisCount: favList.length,
-      countryId: _asInt(json['country_id']),
-      status: (json['status'] ?? '').toString(),
-      entityType: (json['entity_type'] ?? '').toString(),
+      countryId: _asInt(json['user']['country_id']),
+      status: (json['user']['status'] ?? '').toString(),
+      entityType: (json['user']['entity_type'] ?? '').toString(),
     );
   }
 }

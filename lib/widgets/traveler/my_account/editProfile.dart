@@ -120,7 +120,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
         title: Text("✏️ ${lang.t('edit_profile')}"),
         elevation: 0,
@@ -163,7 +163,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
           children: [
             // === Header compact (aligné avec la page Profil)
             // Card(
@@ -220,6 +220,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
             // const SizedBox(height: 12),
 
             // === Section : Informations personnelles
+            _EditProfileHeroCard(
+              name: '${widget.user.firstName} ${widget.user.lastName}'.trim(),
+              email: widget.user.email,
+              subtitle: lang.t('update_profile_text'),
+            ),
+            const SizedBox(height: 16),
             _SectionCard(
               title: lang.t('personal_infos'),
               children: [
@@ -303,21 +309,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget _buildGenderFieldStyled() {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.grey.shade300),
+      borderRadius: BorderRadius.circular(18),
+      borderSide: const BorderSide(color: Color(0xFFE3EAF2)),
     );
 
     return DropdownButtonFormField<String>(
       value: (selectedGender ?? '').isEmpty ? null : selectedGender,
       decoration: InputDecoration(
         labelText: lang.t('gender'),
-        prefixIcon: const Icon(Icons.transgender),
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF244B6B).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.transgender, color: Color(0xFF244B6B)),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF8FBFE),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.2),
+          borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.4),
         ),
       ),
       items: [
@@ -334,38 +349,49 @@ class _EditProfilePageState extends State<EditProfilePage> {
 class _SectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
+
   const _SectionCard({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF244B6B))),
-            const SizedBox(height: 8),
-            ..._withDividers(children),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE4EBF2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF244B6B).withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1D3550),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ..._withSpacing(children),
+        ],
       ),
     );
   }
 
-  List<Widget> _withDividers(List<Widget> items) {
+  List<Widget> _withSpacing(List<Widget> items) {
     final out = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       out.add(items[i]);
       if (i != items.length - 1) {
-        out.add(const SizedBox(height: 10));
+        out.add(const SizedBox(height: 12));
       }
     }
     return out;
@@ -373,6 +399,112 @@ class _SectionCard extends StatelessWidget {
 }
 
 /// Affichage lecture seule (email)
+class _EditProfileHeroCard extends StatelessWidget {
+  final String name;
+  final String email;
+  final String subtitle;
+
+  const _EditProfileHeroCard({
+    required this.name,
+    required this.email,
+    required this.subtitle,
+  });
+
+  String _initialsFrom(String fullName) {
+    final parts = fullName
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .take(2)
+        .toList();
+    if (parts.isEmpty) return 'U';
+    return parts.map((part) => part[0].toUpperCase()).join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF244B6B),
+            Color(0xFF35698F),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF244B6B).withOpacity(0.20),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
+            ),
+            child: Text(
+              _initialsFrom(name),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? 'User' : name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.86),
+                    fontSize: 12.8,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.82),
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DisplayTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -385,14 +517,10 @@ class _DisplayTile extends StatelessWidget {
     return TextFormField(
       initialValue: value,
       readOnly: true,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        filled: true,
-        fillColor: Colors.grey[100],
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+      decoration: _modernInputDecoration(
+        label: label,
+        icon: icon,
+        fillColor: const Color(0xFFF1F5F9),
       ),
     );
   }
@@ -406,28 +534,50 @@ Widget _buildTextField(
   TextInputType keyboard = TextInputType.text,
   IconData? prefix,
 }) {
-  final border = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
-    borderSide: BorderSide(color: Colors.grey.shade300),
-  );
-
   return TextFormField(
     controller: controller,
     keyboardType: keyboard,
-    decoration: InputDecoration(
-      labelText: label,
-      prefixIcon: prefix != null ? Icon(prefix) : null,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: border,
-      enabledBorder: border,
-      focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.2),
-      ),
+    decoration: _modernInputDecoration(
+      label: label,
+      icon: prefix,
     ),
     validator: (value) {
       if (!isRequired) return null;
       if (value == null || value.trim().isEmpty) return 'Champ requis';
       return null;
     },
+  );
+}
+
+InputDecoration _modernInputDecoration({
+  required String label,
+  IconData? icon,
+  Color fillColor = const Color(0xFFF8FBFE),
+}) {
+  final border = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(18),
+    borderSide: const BorderSide(color: Color(0xFFE3EAF2)),
+  );
+
+  return InputDecoration(
+    labelText: label,
+    filled: true,
+    fillColor: fillColor,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    border: border,
+    enabledBorder: border,
+    focusedBorder: border.copyWith(
+      borderSide: const BorderSide(color: Color(0xFF244B6B), width: 1.4),
+    ),
+    prefixIcon: icon != null
+        ? Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF244B6B).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: const Color(0xFF244B6B)),
+          )
+        : null,
   );
 }

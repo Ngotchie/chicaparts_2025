@@ -41,7 +41,7 @@ class ApiPayment {
           };
 
     try {
-      print(body);
+      // print(body);
       final response = await http.post(
         Uri.parse(endpoint),
         headers: headers,

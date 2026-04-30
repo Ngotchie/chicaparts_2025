@@ -4,6 +4,7 @@ import 'package:chicaparts_partner/models/traveler/modele_booking_details.dart';
 import 'package:chicaparts_partner/models/traveler/modele_review.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
+import 'package:chicaparts_partner/widgets/traveler/book/payment_processing_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -161,6 +162,175 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     }
   }
 
+  Future<void> _openPayment(OneBookingDetails d) async {
+    if (_currentUser == null) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentProcessingPage(
+          bookingId: int.tryParse(d.id) ?? 0,
+          amount: d.total.toDouble(),
+          currency: d.currency,
+          customerEmail: d.guestEmail,
+          checkInFormatted: DateFormat('dd MMM yyyy').format(d.firstNight),
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    _refreshDetails();
+  }
+
+  Future<void> _requestBookingChange(OneBookingDetails d) async {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    if (_currentUser == null) return;
+
+    final currentCheckout = d.lastNight.add(const Duration(days: 1));
+    DateTime selectedDate = currentCheckout.add(const Duration(days: 1));
+    final reasonController = TextEditingController();
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: context,
+                firstDate: currentCheckout.add(const Duration(days: 1)),
+                lastDate: DateTime.now().add(const Duration(days: 730)),
+                initialDate: selectedDate,
+              );
+
+              if (picked != null) {
+                setModalState(() => selectedDate = picked);
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(lang.t('extend_booking')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${lang.t('current_checkout')}: ${DateFormat('dd MMM yyyy').format(currentCheckout)}',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      lang.t('new_checkout_date'),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: pickDate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event_outlined),
+                            const SizedBox(width: 10),
+                            Text(
+                              DateFormat('dd MMM yyyy').format(selectedDate),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: lang.t('reason'),
+                        hintText: lang.t('change_reason_hint'),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(lang.t('cancel')),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final reason = reasonController.text.trim();
+
+                    if (!selectedDate.isAfter(currentCheckout)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(lang.t('checkout_date_must_be_after')),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (reason.isNotEmpty && reason.length < 10) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(lang.t('reason_too_short')),
+                        ),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(ctx, true);
+                  },
+                  child: Text(lang.t('send')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (submitted != true) {
+      reasonController.dispose();
+      return;
+    }
+
+    try {
+      await api.requestCheckoutChange(
+        bookingId: int.tryParse(d.id) ?? 0,
+        user: _currentUser!,
+        lastNight: selectedDate.subtract(const Duration(days: 1)),
+        reason: reasonController.text.trim().isEmpty
+            ? null
+            : reasonController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang.t('booking_change_requested'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${lang.t('error')}: $e')),
+      );
+    } finally {
+      reasonController.dispose();
+    }
+  }
+
   @override
   void dispose() {
     _tab.dispose();
@@ -173,7 +343,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     // si pas connecté
     if (_currentUser == null) {
       return CardSection(
-        title: "Avis",
+        title: lang.t('review'),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Text(lang.t('booking_connect_text')),
@@ -273,112 +443,136 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🔹 En-tête personnalisée
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
+    return FutureBuilder<OneBookingDetails>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: SafeArea(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Scaffold(
+            body: SafeArea(
+              child: Center(child: Text(lang.t('error_network'))),
+            ),
+          );
+        }
+
+        final d = snapshot.data!;
+        final bool isConfirmed = d.validationStatus == 'confirmed';
+        final status = d.validationStatus.toLowerCase();
+        final bool canPay =
+            d.paymentStatus != 'paid' && status != 'cancelled';
+        final bool canModify = status == 'confirmed';
+
+        if (_currentUser != null && _loadingReview && isConfirmed) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _checkExistingReview(d);
+          });
+        }
+
+        final tabWidgets = <Tab>[
+          Tab(text: lang.t('booking')),
+          if (isConfirmed) Tab(text: lang.t('useful_info')),
+          if (isConfirmed) Tab(text: lang.t('Check-in_Check-out')),
+          Tab(text: lang.t('accommodation')),
+        ];
+
+        final tabViews = <Widget>[
+          _ReservationTab(
+            d: d,
+            lang: lang,
+            canPay: canPay,
+            canModify: canModify,
+            onPay: canPay ? () => _openPayment(d) : null,
+            onModify: canModify ? () => _requestBookingChange(d) : null,
+            reviewBuilder: isConfirmed ? () => _reviewSection(d) : null,
+          ),
+          if (isConfirmed)
+            _UsefulInfoTab(
+              d: d,
+              lang: lang,
+            ),
+          if (isConfirmed)
+            _AccessTab(
+              d: d,
+              lang: lang,
+            ),
+          _AccommodationTab(
+            d: d,
+            lang: lang,
+          ),
+        ];
+
+        return DefaultTabController(
+          length: tabWidgets.length,
+          child: Scaffold(
+            backgroundColor: Colors.grey[100],
+            body: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Color(0xFF244B6B), size: 22),
-                    onPressed: () => Navigator.pop(context),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Color(0xFF244B6B),
+                            size: 22,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          lang.t('booking_details'),
+                          style: const TextStyle(
+                            color: Color(0xFF244B6B),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    lang.t('booking_details'),
-                    style: const TextStyle(
-                      color: Color(0xFF244B6B),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    color: Colors.white,
+                    child: TabBar(
+                      isScrollable: true,
+                      indicatorColor: const Color(0xFF244B6B),
+                      labelColor: const Color(0xFF244B6B),
+                      unselectedLabelColor: Colors.grey,
+                      indicatorWeight: 3,
+                      tabAlignment: TabAlignment.start,
+                      padding: EdgeInsets.zero,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                      ),
+                      tabs: tabWidgets,
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: tabViews,
                     ),
                   ),
                 ],
               ),
             ),
-
-            // 🔹 Onglets (TabBar)
-            Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tab,
-                isScrollable: true,
-                indicatorColor: const Color(0xFF244B6B),
-                labelColor: const Color(0xFF244B6B),
-                unselectedLabelColor: Colors.grey,
-                indicatorWeight: 3,
-                tabAlignment: TabAlignment.start,
-                padding: EdgeInsets.zero,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                ),
-                tabs: [
-                  Tab(text: lang.t('booking')),
-                  Tab(text: lang.t('useful_info')),
-                  Tab(text: lang.t('Check-in_Check-out')),
-                  Tab(text: lang.t('accommodation')),
-                ],
-              ),
-            ),
-
-            // 🔹 Contenu dynamique
-            Expanded(
-              child: FutureBuilder<OneBookingDetails>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError || !snapshot.hasData) {
-                    return Center(child: Text(lang.t('error_network')));
-                  }
-
-                  final d = snapshot.data!;
-
-                  if (_currentUser != null && _loadingReview) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _checkExistingReview(d);
-                    });
-                  }
-
-                  return TabBarView(
-                    controller: _tab,
-                    children: [
-                      _ReservationTab(
-                        d: d,
-                        lang: lang,
-                        reviewBuilder: () => _reviewSection(d),
-                      ),
-                      _UsefulInfoTab(
-                        d: d,
-                        lang: lang,
-                      ),
-                      _AccessTab(
-                        d: d,
-                        lang: lang,
-                      ),
-                      _AccommodationTab(
-                        d: d,
-                        lang: lang,
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -387,9 +581,19 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
 class _ReservationTab extends StatelessWidget {
   final OneBookingDetails d;
   final LanguageProvider lang;
+  final bool canPay;
+  final bool canModify;
+  final VoidCallback? onPay;
+  final VoidCallback? onModify;
   final Widget Function()? reviewBuilder; // 👈 optionnel
   const _ReservationTab(
-      {required this.d, required this.lang, this.reviewBuilder});
+      {required this.d,
+      required this.lang,
+      required this.canPay,
+      required this.canModify,
+      this.onPay,
+      this.onModify,
+      this.reviewBuilder});
 
   @override
   Widget build(BuildContext context) {
@@ -400,6 +604,33 @@ class _ReservationTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (canPay || canModify) ...[
+          const SizedBox(height: 12),
+          CardSection(
+            title: lang.t('account_actions'),
+            child: Row(
+              children: [
+                if (canPay)
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onPay,
+                      icon: const Icon(Icons.payment),
+                      label: Text(lang.t('pay_now')),
+                    ),
+                  ),
+                if (canPay && canModify) const SizedBox(width: 12),
+                if (canModify)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onModify,
+                      icon: const Icon(Icons.edit_calendar_outlined),
+                      label: Text(lang.t('update')),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         CardSection(
           title: lang.t('stay_information'),
           child: _twoCols(
@@ -623,7 +854,7 @@ class _AccommodationTab extends StatelessWidget {
                     if (d.accommodationId != null) {
                       Navigator.pushNamed(
                         context,
-                        '/accommodation/${d.accommodationId}/${d.currency}/${d.price}',
+                        '/acc/${d.accommodationId}/${d.currency}/${d.price}',
                       );
                     }
                   },

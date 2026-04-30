@@ -5,7 +5,6 @@ import 'package:chicaparts_partner/models/model_booking.dart';
 import 'package:chicaparts_partner/models/traveler/modele_booking_traveler.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/widgets/login/welcome.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/myBooking.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/profile.dart';
@@ -399,8 +398,11 @@ Thank you for your assistance 😊
                   )
                 : !isGuest
                     ? RefreshIndicator(
-                        onRefresh: _loadUserSession,
-                        child: CustomScrollView(
+                      onRefresh: () async {
+                        await _loadUserSession();
+                        await _loadRecentBookings();
+                      },
+                      child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           slivers: [
                             const SliverToBoxAdapter(
@@ -464,7 +466,7 @@ Thank you for your assistance 😊
                                 ),
                                 QuickAction(
                                   Icons.favorite_border,
-                                  lang.t('favotite'),
+                                  lang.t('favorite'),
                                   () => Navigator.pushNamed(
                                       context, '/favorites'),
                                 ),
@@ -473,6 +475,18 @@ Thank you for your assistance 😊
                                   lang.t('my_profile'),
                                   () => Navigator.pushNamed(
                                       context, '/account/profile'),
+                                ),
+                                QuickAction(
+                                  Icons.report_problem_outlined,
+                                  lang.t('my_claims'),
+                                  () => Navigator.pushNamed(
+                                      context, '/operation'),
+                                ),
+                                QuickAction(
+                                  Icons.account_balance_wallet_outlined,
+                                  lang.t('my_transactions'),
+                                  () => Navigator.pushNamed(
+                                      context, '/account/transactions'),
                                 ),
                               ]),
                             ),
@@ -614,17 +628,6 @@ Thank you for your assistance 😊
           ),
         ),
       ),
-    );
-  }
-
-  void logoutUser(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // 🔐 Supprime toute la session
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const WelcomePage()),
-      (route) => false,
     );
   }
 }

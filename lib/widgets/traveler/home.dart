@@ -209,12 +209,19 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.notifications, size: 28),
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final changed = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const SettingsPage()),
+                              builder: (_) => const SettingsPage(),
+                            ),
                           );
+
+                          if (changed == true) {
+                            setState(() {
+                              // recharge ce qui dépend de la langue / devise
+                            });
+                          }
                         },
                       ),
                       if (hasNotification)
@@ -670,31 +677,43 @@ class _HomePageState extends State<HomePage> {
           child: Stack(
             children: [
               // 📌 Augmenter la taille des images
-              Image.network(
-                destination.imageUrl, // Utilisation du lien dynamique
-                width: 160,
-                height: 180,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return SizedBox(
-                    width: 160,
-                    height: 200,
-                    child: Shimmer.fromColors(
-                      baseColor: Colors.grey[300]!,
-                      highlightColor: Colors.white,
-                      child: Container(
-                        height: 200,
-                        color: Colors.white,
-                      ),
+              (destination.imageUrl.isNotEmpty)
+                  ? Image.network(
+                      destination.imageUrl,
+                      width: 160,
+                      height: 180,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return SizedBox(
+                          width: 160,
+                          height: 180,
+                          child: Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.white,
+                            child: Container(
+                              width: 160,
+                              height: 180,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image.asset(
+                          'assets/images/default-destination.png',
+                          width: 160,
+                          height: 180,
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      'assets/images/default-destination.png',
+                      width: 160,
+                      height: 180,
+                      fit: BoxFit.cover,
                     ),
-                  ); // Loader Shimmer ⏳
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.broken_image,
-                      size: 160, color: Colors.grey); // Icône en cas d'erreur
-                },
-              ),
               Container(
                 width: 160,
                 height: 180,

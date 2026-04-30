@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:chicaparts_partner/providers/language_provider.dart';
 
 class OneBookingDetails {
+  var lang;
   // Core
   final String id;
   final DateTime firstNight;

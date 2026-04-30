@@ -201,6 +201,36 @@ class ApiBooking {
     }
   }
 
+  Future<void> requestCheckoutChange({
+    required int bookingId,
+    required User user,
+    required DateTime lastNight,
+    String? reason,
+  }) async {
+    final url = ApiUrl();
+    final apiUrl = url.getChicapartsUrl();
+    final apiKey = url.getKey();
+    final response = await http.post(
+      Uri.parse('${apiUrl}booking/request-date-change?user_id=${user.id}'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Authorization': apiKey,
+      },
+      body: jsonEncode({
+        'booking_id': bookingId,
+        'lastNight': lastNight.toIso8601String(),
+        'reason': reason,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur demande modification réservation (${response.statusCode})',
+      );
+    }
+  }
+
   Future<UserProfile> fetchUserProfile(User user) async {
     ApiUrl url = ApiUrl();
     final apiUrl = url.getChicapartsUrl();
@@ -216,7 +246,7 @@ class ApiBooking {
 
     if (response.statusCode == 200) {
       final jsonBody = jsonDecode(response.body);
-      return UserProfile.fromJson(jsonBody['user']);
+      return UserProfile.fromJson(jsonBody);
     } else if (response.statusCode == 403) {
       throw Exception("⛔ Token invalide");
     } else {

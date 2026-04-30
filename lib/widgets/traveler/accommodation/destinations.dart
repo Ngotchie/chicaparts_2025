@@ -222,28 +222,39 @@ class _DestinationsPageState extends State<DestinationsPage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
-                child: Image.network(
-                  destination.imageUrl, // Utilisation du lien dynamique
-                  width: double.infinity,
-                  height: 200,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Shimmer.fromColors(
-                      baseColor: Colors.grey[300]!,
-                      highlightColor: Colors.white,
-                      child: Container(
+                child: (destination.imageUrl.isNotEmpty)
+                    ? Image.network(
+                        destination.imageUrl,
                         width: double.infinity,
                         height: 200,
-                        color: Colors.white,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.white,
+                            child: Container(
+                              width: double.infinity,
+                              height: 200,
+                              color: Colors.white,
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Image.asset(
+                            'assets/images/default-destination.png',
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        'assets/images/default-destination.png',
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
                       ),
-                    ); // Loader Shimmer ⏳
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.broken_image,
-                        size: 160, color: Colors.grey); // Icône en cas d'erreur
-                  },
-                ),
               ),
               Container(
                 width: double.infinity,
