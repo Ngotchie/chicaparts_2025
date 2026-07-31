@@ -19,7 +19,7 @@ class ApiBooking {
     String apiKey = url.getKey();
 
     final response = await http.get(
-        Uri.parse('${apiUrl}properties/availabilities/$accommodationId'),
+        Uri.parse('${apiUrl}properties/$accommodationId/availabilities'),
         headers: {
           'Accept': 'application/json',
           'X-Authorization': apiKey,
@@ -35,9 +35,8 @@ class ApiBooking {
         bool available = item["available"];
 
         if (available) {
-          Map<String, dynamic> rates = item["rate"][""];
-
-          double price = extractMaxPrice(rates);
+          final price =
+              extractAvailabilityPrice(Map<String, dynamic>.from(item));
 
           availabilityData[date] = price;
         }
@@ -48,22 +47,57 @@ class ApiBooking {
     }
   }
 
-  double extractMaxPrice(Map<String, dynamic> data) {
-    if (!data.containsKey("prices") || data["prices"] is! List) {
-      print("⚠️ Erreur: Pas de prix disponibles.");
-      return 0.0;
+  double extractAvailabilityPrice(Map<String, dynamic> item) {
+    final directPrice = _toPrice(item['price']);
+    if (directPrice > 0) return directPrice;
+
+    final rate = item['rate'];
+    if (rate is Map && rate[''] is Map) {
+      return extractMaxPrice(Map<String, dynamic>.from(rate['']));
     }
 
-    List<dynamic> pricesList = data["prices"];
+    return 0.0;
+  }
 
-    // 🔥 Trouver le prix max basé sur le nombre de personnes `up`
-    var bestPriceEntry =
-        pricesList.reduce((a, b) => (a["up"] ?? 0) > (b["up"] ?? 0) ? a : b);
+  double extractMaxPrice(Map<String, dynamic> data) {
+    final prices = data['prices'];
+    if (prices is List) {
+      final validPrices = prices
+          .map((entry) {
+            if (entry is Map) return _toPrice(entry['price']);
+            return _toPrice(entry);
+          })
+          .where((price) => price > 0)
+          .toList();
 
-    double maxPrice = (bestPriceEntry["price"] is List)
-        ? 0.0
-        : (bestPriceEntry["price"] ?? 0).toDouble();
-    return maxPrice;
+      if (validPrices.isNotEmpty) {
+        return validPrices.reduce((a, b) => a > b ? a : b);
+      }
+    }
+
+    final directPrices = data.entries
+        .where((entry) => RegExp(r'^p\d+$').hasMatch(entry.key))
+        .map((entry) => _toPrice(entry.value))
+        .where((price) => price > 0)
+        .toList();
+
+    if (directPrices.isEmpty) return 0.0;
+    return directPrices.reduce((a, b) => a > b ? a : b);
+  }
+
+  double _toPrice(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    if (value is List) {
+      final values = value.map(_toPrice).where((price) => price > 0).toList();
+      if (values.isEmpty) return 0.0;
+      return values.reduce((a, b) => a > b ? a : b);
+    }
+    if (value is Map) {
+      return _toPrice(value['price'] ?? value['amount'] ?? value['value']);
+    }
+    return 0.0;
   }
 
   Future<dynamic> submitReservation({
@@ -103,9 +137,12 @@ class ApiBooking {
     );
 
     if (response.statusCode == 200) {
-      print("✅ Réservation créée !");
       final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['error'] != null) {
+        throw Exception(data['error']);
+      }
       saveReservationLocally(data);
+      print("✅ Réservation créée !");
       return data;
     } else {
       throw Exception("❌ Erreur réservation : ${response.statusCode}");
@@ -227,6 +264,34 @@ class ApiBooking {
     if (response.statusCode != 200) {
       throw Exception(
         'Erreur demande modification réservation (${response.statusCode})',
+      );
+    }
+  }
+
+  Future<void> requestCancellationRefund({
+    required int bookingId,
+    required User user,
+    String? reason,
+  }) async {
+    final url = ApiUrl();
+    final apiUrl = url.getChicapartsUrl();
+    final apiKey = url.getKey();
+    final response = await http.post(
+      Uri.parse('${apiUrl}booking/request-cancellation?user_id=${user.id}'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Authorization': apiKey,
+      },
+      body: jsonEncode({
+        'booking_id': bookingId,
+        'reason': reason,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Erreur demande annulation/remboursement (${response.statusCode})',
       );
     }
   }

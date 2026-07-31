@@ -11,6 +11,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
 android {
     namespace = "com.mayem_solutions.chicaparts"
     compileSdk = 36
@@ -34,6 +40,10 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders = [
+            applicationName: "android.app.Application",
+            mapsApiKey: localProperties.getProperty('MAPS_API_KEY', '')
+        ]
     }
     signingConfigs {
         release {

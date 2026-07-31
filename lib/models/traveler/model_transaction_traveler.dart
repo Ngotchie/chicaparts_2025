@@ -11,6 +11,7 @@ class TravelerTransaction {
   final num fees;
   final String status;
   final bool success;
+  final int paymentItemId;
   final String paymentItemType;
   final String createdAt;
 
@@ -27,6 +28,7 @@ class TravelerTransaction {
     required this.fees,
     required this.status,
     required this.success,
+    required this.paymentItemId,
     required this.paymentItemType,
     required this.createdAt,
   });
@@ -60,6 +62,9 @@ class TravelerTransaction {
       fees: _asNum(json['fees']),
       status: '${json['status'] ?? ''}',
       success: _asBool(json['success']),
+      paymentItemId: json['payment_item_id'] is int
+          ? json['payment_item_id']
+          : int.tryParse('${json['payment_item_id']}') ?? 0,
       paymentItemType: '${json['payment_item_type'] ?? ''}',
       createdAt: '${json['created_at'] ?? ''}',
     );

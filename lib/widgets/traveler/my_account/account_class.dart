@@ -3,7 +3,9 @@ import 'package:chicaparts_partner/models/model_booking.dart';
 import 'package:chicaparts_partner/models/traveler/modele_review.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/providers/currency_provider.dart';
+import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/traveler/tips/tip_payment_processing_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -188,8 +190,18 @@ class MiniStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
-    final caption = TextStyle(fontSize: 12, color: Colors.grey[600]);
-    const valueStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.w800);
+    final colors = Theme.of(context).colorScheme;
+    final caption = TextStyle(
+      fontSize: 11.5,
+      height: 1.2,
+      color: colors.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    final valueStyle = TextStyle(
+      fontSize: 20,
+      color: colors.onSurface,
+      fontWeight: FontWeight.w800,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -200,28 +212,37 @@ class MiniStatsRow extends StatelessWidget {
             _MiniStatInline(
               icon: Icons.event_available,
               value: reservations.toString(),
-              label: lang.t('book...'),
+              label: lang.t('my_bookings'),
               iconColor: const Color(0xFFB8860B),
               valueStyle: valueStyle,
               captionStyle: caption,
+              onTap: () {
+                Navigator.pushNamed(context, '/reservations');
+              },
             ),
             _MiniStatDivider(),
             _MiniStatInline(
               icon: Icons.favorite_border,
               value: favorites.toString(),
-              label: lang.t('favorite'),
+              label: lang.t('my_favorites'),
               iconColor: const Color(0xFF1E88E5),
               valueStyle: valueStyle,
               captionStyle: caption,
+              onTap: () {
+                Navigator.pushNamed(context, '/favorites');
+              },
             ),
             _MiniStatDivider(),
             _MiniStatInline(
               icon: Icons.reviews,
               value: reviews.toString(),
-              label: lang.t('review'),
+              label: lang.t('my_reviews'),
               iconColor: const Color(0xFF7E57C2),
               valueStyle: valueStyle,
               captionStyle: caption,
+              onTap: () {
+                Navigator.pushNamed(context, '/avis');
+              },
             ),
           ],
         ),
@@ -237,6 +258,7 @@ class _MiniStatInline extends StatelessWidget {
   final Color iconColor;
   final TextStyle valueStyle;
   final TextStyle captionStyle;
+  final VoidCallback onTap;
 
   const _MiniStatInline({
     required this.icon,
@@ -245,25 +267,42 @@ class _MiniStatInline extends StatelessWidget {
     required this.iconColor,
     required this.valueStyle,
     required this.captionStyle,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 18, color: iconColor),
-          const SizedBox(width: 8),
-          Column(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 18, color: iconColor),
+              ),
+              const SizedBox(height: 6),
               Text(value, style: valueStyle),
-              Text(label, style: captionStyle),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                softWrap: true,
+                style: captionStyle,
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -275,7 +314,7 @@ class _MiniStatDivider extends StatelessWidget {
     return VerticalDivider(
       width: 24, // espace latéral total
       thickness: 1,
-      color: Colors.grey[300],
+      color: Theme.of(context).colorScheme.outlineVariant,
     );
   }
 }
@@ -583,7 +622,8 @@ class QuickActions extends StatelessWidget {
     final columns = w < 420 ? 2 : 4;
 
     // Largeur dispo = largeur écran - padding gauche/droite - espacements entre colonnes
-    final itemWidth = (w - (paddingH * 2) - (spacing * (columns - 1))) / columns;
+    final itemWidth =
+        (w - (paddingH * 2) - (spacing * (columns - 1))) / columns;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(paddingH, 8, paddingH, 8),
@@ -746,7 +786,14 @@ class MoneyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = "${NumberFormat('#,##0').format(amount)} $currency";
+    final selectedCurrency = context.watch<CurrencyProvider>().currency;
+    final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    final text = CurrencyConverter.format(
+      amount.toDouble(),
+      from: currency,
+      to: selectedCurrency,
+      rates: exchangeRates,
+    );
     return InfoRowGlobal(
       label,
       text,
@@ -1104,7 +1151,7 @@ class _ExpandableCommentState extends State<ExpandableComment> {
   }
 }
 
-class ReservationInProgressCard extends StatelessWidget {
+class ActiveBookingCard extends StatelessWidget {
   final String title;
   final String city; // "Omnisport, Yaoundé, Cameroon"
   final DateTime firstNight;
@@ -1115,13 +1162,12 @@ class ReservationInProgressCard extends StatelessWidget {
   final String paymentStatus; // "paid"|"unpaid"|"partial"
   final String statusLabel; // "En attente", "Confirmée"…
   final String? imageUrl;
-
   final VoidCallback onChangeDates;
   final VoidCallback onTip; // (non utilisé dans la version light, mais dispo)
   final VoidCallback onReview; // idem
   final VoidCallback onMore; // utilisé comme "Voir les détails"
 
-  const ReservationInProgressCard({
+  const ActiveBookingCard({
     super.key,
     required this.title,
     required this.city,
@@ -1153,9 +1199,16 @@ class ReservationInProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
-    final nf = NumberFormat('#,##0');
+    final selectedCurrency = context.watch<CurrencyProvider>().currency;
+    final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    final displayedTotal = CurrencyConverter.format(
+      totalAmount.toDouble(),
+      from: currency,
+      to: selectedCurrency,
+      rates: exchangeRates,
+    );
     final df = DateFormat('dd MMM yyyy');
-    final endInc = lastNight; // adapte si lastNight est exclusif
+    final checkout = lastNight.add(const Duration(days: 1));
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1265,7 +1318,7 @@ class ReservationInProgressCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  "${df.format(firstNight)} – ${df.format(endInc)}",
+                                  "${df.format(firstNight)} - ${df.format(checkout)}",
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
@@ -1284,7 +1337,7 @@ class ReservationInProgressCard extends StatelessWidget {
                       children: [
                         // Montant total
                         Text(
-                          "${nf.format(totalAmount)} $currency",
+                          displayedTotal,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -1326,8 +1379,8 @@ class ReservationInProgressCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _PillButton.outlined(
-                  icon: Icons.calendar_month_outlined,
-                  label: lang.t('update'),
+                  icon: Icons.more_horiz_rounded,
+                  label: 'Actions',
                   onTap: onChangeDates,
                 ),
               ),
@@ -1754,190 +1807,323 @@ class TipWidget extends StatefulWidget {
   State<TipWidget> createState() => _TipWidgetState();
 }
 
+class _QuickTipAmount {
+  final double amount;
+  final String label;
+  final String? subLabel;
+
+  const _QuickTipAmount({
+    required this.amount,
+    required this.label,
+    this.subLabel,
+  });
+}
+
 class _TipWidgetState extends State<TipWidget> {
   final customCtrl = TextEditingController();
-  int? selectedAmount;
-
-  List<int> quickTips = [];
+  double? selectedAmount;
 
   @override
-  void initState() {
-    super.initState();
-
-    // Récupération devise utilisateur via Provider
-    final currencyProvider =
-        Provider.of<CurrencyProvider>(context, listen: false);
-
-    final currency = currencyProvider.currency; // "EUR", "XAF", "USD"
-    final total = widget.booking.price ?? 0;
-
-    // Calcul des tips : 5%, 10%, 15%
-    final tip5 = (total * 0.05).round();
-    final tip10 = (total * 0.10).round();
-    final tip15 = (total * 0.15).round();
-
-    quickTips = [tip5, tip10, tip15];
+  void dispose() {
+    customCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
-    final currencyProvider =
-        Provider.of<CurrencyProvider>(context, listen: false);
-
-    final currency = currencyProvider.currency; // "EUR", "XAF", "USD"
+    final selectedCurrency = context.watch<CurrencyProvider>().currency;
+    final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    final currency = _normalizeCurrency(selectedCurrency);
     final symbol = currency == "XAF" ? "FCFA" : currency;
+    final quickTips = _quickTipAmounts(currency, exchangeRates);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
-        top: 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            lang.t('stay_end'),
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF244B6B),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-          Text(
-            lang.t('tip_thank_text'),
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-
-          const SizedBox(height: 20),
-
-          // 🔹 Montants rapides adaptés à la devise
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: quickTips.map((amount) {
-              final isSelected = selectedAmount == amount;
-              return GestureDetector(
-                onTap: () => setState(() => selectedAmount = amount),
+    return SafeArea(
+      top: false,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  width: 42,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color:
-                        isSelected ? const Color(0xFF244B6B) : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFFD0D5DD),
+                    borderRadius: BorderRadius.circular(99),
                   ),
-                  child: Text(
-                    "$amount $symbol",
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF6E5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.volunteer_activism_outlined,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          lang.t('stay_end'),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF101828),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.booking.accommodation,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF667085),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                lang.t('tip_thank_text'),
+                style: const TextStyle(
+                  color: Color(0xFF667085),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: quickTips.map((tip) {
+                  final isSelected = selectedAmount == tip.amount;
+                  return InkWell(
+                    onTap: () {
+                      customCtrl.clear();
+                      setState(() => selectedAmount = tip.amount);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF244B6B)
+                            : const Color(0xFFF6F8FA),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF244B6B)
+                              : const Color(0xFFE4EAF0),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            tip.label,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF344054),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (tip.subLabel != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              tip.subLabel!,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white70
+                                    : const Color(0xFF667085),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: customCtrl,
+                keyboardType: TextInputType.number,
+                onChanged: (_) {
+                  if (selectedAmount != null) {
+                    setState(() => selectedAmount = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: "${lang.t('custom_amount')} ($symbol)",
+                  prefixIcon: const Icon(Icons.edit_outlined),
+                  filled: true,
+                  fillColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withOpacity(0.55),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 12,
+                  ),
+                  border: _tipInputBorder(),
+                  enabledBorder: _tipInputBorder(),
+                  focusedBorder: _tipInputBorder(const Color(0xFF244B6B)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    final value = selectedAmount ??
+                        double.tryParse(
+                          customCtrl.text.trim().replaceAll(',', '.'),
+                        );
+
+                    if (value == null || value <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(lang.t('enter_valid_amount')),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(context);
+                    _sendTip(context, widget.booking, value, currency);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF244B6B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.payments_outlined),
+                  label: Text(
+                    lang.t('send_tip'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 20),
-
-          // 🔹 Montant personnalisé
-          TextField(
-            controller: customCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: "${lang.t('custom_amount')} ($symbol)",
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(width: 1, color: Colors.grey),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(width: 1, color: Colors.grey),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // 🔹 Bouton valider
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                final value =
-                    selectedAmount ?? int.tryParse(customCtrl.text.trim());
-
-                if (value == null || value <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(lang.t('enter_valid_amount')),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                Navigator.pop(context);
-                _sendTip(context, widget.booking, value, currency);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF244B6B),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(
-                lang.t('send_tip'),
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-        ],
+        ),
       ),
+    );
+  }
+
+  List<_QuickTipAmount> _quickTipAmounts(
+    String currency,
+    Map<String, double> rates,
+  ) {
+    const euroAmounts = [5, 10, 20];
+    return euroAmounts.map((amount) {
+      final converted = CurrencyConverter.convert(
+        amount: amount.toDouble(),
+        from: 'EUR',
+        to: currency,
+        rates: rates,
+      );
+      final payableAmount = currency == 'XAF'
+          ? _roundXaf(converted).toDouble()
+          : double.parse(converted.toStringAsFixed(2));
+      return _QuickTipAmount(
+        amount: payableAmount,
+        label: CurrencyConverter.format(
+          payableAmount,
+          from: currency,
+          to: currency,
+          rates: rates,
+        ),
+        subLabel: currency == 'EUR' ? null : '≈ $amount EUR',
+      );
+    }).toList();
+  }
+
+  int _roundXaf(double amount) {
+    return (amount / 100).round() * 100;
+  }
+
+  String _normalizeCurrency(String currency) {
+    final value = currency.trim().toUpperCase();
+    if (value == 'FCFA' || value == 'CFA' || value == 'XOF') return 'XAF';
+    return value;
+  }
+
+  OutlineInputBorder _tipInputBorder([
+    Color color = const Color(0xFFE4EAF0),
+  ]) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color, width: 1.1),
     );
   }
 
   void _sendTip(
     BuildContext context,
     Booking booking,
-    int amount,
+    double amount,
     String currency,
   ) {
     final symbol = currency == "XAF" ? "FCFA" : currency;
 
     final lang = Provider.of<LanguageProvider>(context, listen: false);
-    // Construire un petit label pour le séjour
     String stayLabel;
     try {
       final first = DateTime.parse(booking.firstNight);
-      final last = DateTime.parse(booking.lastNight);
+      final checkout = DateTime.parse(booking.lastNight).add(
+        const Duration(days: 1),
+      );
       final fmt = DateFormat('dd MMM yyyy');
       stayLabel =
-          "${lang.t('stay_from')} ${fmt.format(first)} ${lang.t('to')} ${fmt.format(last)}";
+          "${lang.t('stay_from')} ${fmt.format(first)} ${lang.t('to')} ${fmt.format(checkout)}";
     } catch (_) {
       stayLabel = "Séjour récent";
     }
 
-    // Email du client → tu peux adapter selon ton modèle
     final customerEmail = booking.guestFirstName ?? "";
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => TipPaymentProcessingPage(
-          amount: amount.toDouble(),
-          currency: symbol, // "FCFA" / "EUR" / "USD"
+          amount: amount,
+          currency: symbol,
           customerEmail: customerEmail,
           bookingId: booking.id,
           stayLabel: stayLabel,

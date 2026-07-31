@@ -1,9 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:chicaparts_partner/widgets/traveler/book/selectBookingDetails.dart';
+import 'package:chicaparts_partner/providers/language_provider.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/billingInfos.dart';
+import 'package:chicaparts_partner/widgets/traveler/book/selectBookingDetails.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-showPaymentDialog(BuildContext parentContext, BookingDetails bookingDetails,
-    BillingInfo billingInfo, TimeOfDay? arrivalTime) {
+showPaymentDialog(
+  BuildContext parentContext,
+  BookingDetails bookingDetails,
+  BillingInfo billingInfo,
+  TimeOfDay? arrivalTime,
+) {
+  final lang = Provider.of<LanguageProvider>(parentContext, listen: false);
+
   showModalBottomSheet(
     context: parentContext,
     shape: const RoundedRectangleBorder(
@@ -11,9 +19,7 @@ showPaymentDialog(BuildContext parentContext, BookingDetails bookingDetails,
     ),
     isScrollControlled: true,
     builder: (context) {
-      // Utiliser une variable mutable via ValueNotifier
-      final ValueNotifier<String> selectedPaymentMethod =
-          ValueNotifier("Credit Card");
+      final selectedPaymentMethod = ValueNotifier("Credit Card");
 
       return StatefulBuilder(
         builder: (context, setModalState) {
@@ -25,39 +31,40 @@ showPaymentDialog(BuildContext parentContext, BookingDetails bookingDetails,
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text("Select Payment Method",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      lang.t('select_payment_method'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    _buildPaymentOption(selectedPaymentMethod, "Credit Card"),
-                    _buildPaymentOption(selectedPaymentMethod, "Mobile Money"),
-                    _buildPaymentOption(selectedPaymentMethod, "PayPal"),
+                    _buildPaymentOption(
+                      selectedPaymentMethod,
+                      "Credit Card",
+                      lang,
+                    ),
+                    _buildPaymentOption(
+                      selectedPaymentMethod,
+                      "Mobile Money",
+                      lang,
+                    ),
+                    _buildPaymentOption(selectedPaymentMethod, "PayPal", lang),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: () async {
                         Navigator.pop(context);
-                        // final result = await processPayment(
-                        //   context,
-                        //   bookingDetails,
-                        //   billingInfo,
-                        //   arrivalTime,
-                        //   selectedPaymentMethod.value,
-                        // );
-                        // if (result != null) {
-                        //   await handlePaymentResponse(parentContext, result,
-                        //       selectedPaymentMethod.value);
-                        // } else {
-                        //   showErrorDialog(parentContext,
-                        //       "An error occurred while processing your payment.");
-                        // }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF244B6B),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      child: const Text("Continue",
-                          style: TextStyle(color: Colors.white)),
+                      child: Text(
+                        lang.t('continue'),
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
                   ],
                 );
@@ -70,7 +77,11 @@ showPaymentDialog(BuildContext parentContext, BookingDetails bookingDetails,
   );
 }
 
-Widget _buildPaymentOption(ValueNotifier<String> selected, String method) {
+Widget _buildPaymentOption(
+  ValueNotifier<String> selected,
+  String method,
+  LanguageProvider lang,
+) {
   return GestureDetector(
     onTap: () => selected.value = method,
     child: Container(
@@ -79,15 +90,14 @@ Widget _buildPaymentOption(ValueNotifier<String> selected, String method) {
       decoration: BoxDecoration(
         color: selected.value == method ? Colors.blue[50] : Colors.white,
         border: Border.all(
-            color: selected.value == method
-                ? const Color(0xFF244B6B)
-                : Colors.grey),
+          color: selected.value == method ? const Color(0xFF244B6B) : Colors.grey,
+        ),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(method, style: const TextStyle(fontSize: 16)),
+          Text(_methodLabel(method, lang), style: const TextStyle(fontSize: 16)),
           Radio<String>(
             value: method,
             groupValue: selected.value,
@@ -97,4 +107,17 @@ Widget _buildPaymentOption(ValueNotifier<String> selected, String method) {
       ),
     ),
   );
+}
+
+String _methodLabel(String method, LanguageProvider lang) {
+  switch (method) {
+    case "Credit Card":
+      return lang.t('credit_card');
+    case "Mobile Money":
+      return lang.t('mobile_money');
+    case "PayPal":
+      return lang.t('paypal');
+    default:
+      return method;
+  }
 }

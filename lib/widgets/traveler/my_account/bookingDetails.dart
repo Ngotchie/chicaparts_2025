@@ -11,7 +11,10 @@ import 'package:intl/intl.dart';
 // Branche ces imports vers TES services/modèles
 import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
 import 'package:chicaparts_partner/models/model_booking.dart';
+import 'package:chicaparts_partner/providers/currency_provider.dart';
+import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,8 +31,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
   final api = ApiBooking();
   final _apiReview = ApiReview();
 
-  late Future<OneBookingDetails> _future; // <-- crée un modèle "BookingDetails"
-  late TabController _tab;
+  Future<OneBookingDetails>? _future; // loaded after user bootstrap
 
   User? _currentUser;
   Review? _myReview;
@@ -37,11 +39,18 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
 
   var lang;
 
+  String _formatMoney(num amount, String currency) {
+    return CurrencyConverter.format(
+      amount.toDouble(),
+      from: currency,
+      to: context.read<CurrencyProvider>().currency,
+      rates: context.read<ExchangeRateProvider>().rates,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
-
     _init();
   }
 
@@ -162,6 +171,22 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     }
   }
 
+  void _leaveBookingDetails() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.pushReplacementNamed('/reservations');
+    }
+  }
+
+  Future<bool> _handleSystemBack() async {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) return true;
+    navigator.pushReplacementNamed('/reservations');
+    return false;
+  }
+
   Future<void> _openPayment(OneBookingDetails d) async {
     if (_currentUser == null) return;
 
@@ -170,10 +195,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
       MaterialPageRoute(
         builder: (_) => PaymentProcessingPage(
           bookingId: int.tryParse(d.id) ?? 0,
-          amount: d.total.toDouble(),
+          amount: (d.total - d.paidAmount).clamp(0, d.total).toDouble(),
           currency: d.currency,
           customerEmail: d.guestEmail,
+          customerPhoneNumber: d.guestPhone,
           checkInFormatted: DateFormat('dd MMM yyyy').format(d.firstNight),
+          resumeMode: true,
         ),
       ),
     );
@@ -189,12 +216,19 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     final currentCheckout = d.lastNight.add(const Duration(days: 1));
     DateTime selectedDate = currentCheckout.add(const Duration(days: 1));
     final reasonController = TextEditingController();
+    // Une prolongation est estimée sur le tarif d'hébergement moyen.
+    // Les taxes et frais ponctuels du séjour existant ne doivent pas être
+    // redistribués artificiellement sur chaque nuit supplémentaire.
+    final dailyTotal = d.nights > 0 ? d.price / d.nights : d.price;
 
     final submitted = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final extraNights = selectedDate.difference(currentCheckout).inDays;
+            final supplement = dailyTotal * extraNights;
+
             Future<void> pickDate() async {
               final picked = await showDatePicker(
                 context: context,
@@ -209,19 +243,51 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
             }
 
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: Text(lang.t('extend_booking')),
+              titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+              title: _RequestDialogTitle(
+                icon: Icons.event_repeat_outlined,
+                title: lang.t('extend_booking'),
+                color: const Color(0xFF244B6B),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${lang.t('current_checkout')}: ${DateFormat('dd MMM yyyy').format(currentCheckout)}',
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6F8FA),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
+                      ),
+                      child: _DialogInfoLine(
+                        label: lang.t('current_checkout'),
+                        value: DateFormat('dd MMM yyyy').format(
+                          currentCheckout,
+                        ),
+                        bold: true,
+                      ),
                     ),
                     const SizedBox(height: 12),
+                    Text(
+                      lang.t('extend_booking_intro'),
+                      style: const TextStyle(
+                        color: Color(0xFF667085),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       lang.t('new_checkout_date'),
                       style: const TextStyle(fontWeight: FontWeight.w600),
@@ -237,18 +303,55 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                           vertical: 14,
                         ),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.event_outlined),
-                            const SizedBox(width: 10),
-                            Text(
-                              DateFormat('dd MMM yyyy').format(selectedDate),
+                            const Icon(
+                              Icons.event_outlined,
+                              color: Color(0xFF244B6B),
                             ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                DateFormat('dd MMM yyyy').format(selectedDate),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.expand_more),
                           ],
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF6EF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFC8EAD6)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _DialogInfoLine(
+                            label: lang.t('additional_nights'),
+                            value: '$extraNights',
+                          ),
+                          const SizedBox(height: 8),
+                          _DialogInfoLine(
+                            label: lang.t('estimated_supplement'),
+                            value: _formatMoney(supplement, d.currency),
+                            bold: true,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -258,42 +361,77 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                       decoration: InputDecoration(
                         labelText: lang.t('reason'),
                         hintText: lang.t('change_reason_hint'),
-                        border: const OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                        filled: true,
+                        fillColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withOpacity(0.55),
+                        border: _requestInputBorder(),
+                        enabledBorder: _requestInputBorder(),
+                        focusedBorder: _requestInputBorder(
+                          const Color(0xFF244B6B),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(lang.t('cancel')),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final reason = reasonController.text.trim();
-
-                    if (!selectedDate.isAfter(currentCheckout)) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(lang.t('checkout_date_must_be_after')),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF244B6B),
+                          side: const BorderSide(color: Color(0xFFE4EAF0)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      );
-                      return;
-                    }
+                        child: Text(lang.t('cancel')),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          final reason = reasonController.text.trim();
 
-                    if (reason.isNotEmpty && reason.length < 10) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(lang.t('reason_too_short')),
+                          if (!selectedDate.isAfter(currentCheckout)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  lang.t('checkout_date_must_be_after'),
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (reason.isNotEmpty && reason.length < 10) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(lang.t('reason_too_short')),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(ctx, true);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF244B6B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(ctx, true);
-                  },
-                  child: Text(lang.t('send')),
+                        child: Text(lang.t('send')),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -311,7 +449,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
       await api.requestCheckoutChange(
         bookingId: int.tryParse(d.id) ?? 0,
         user: _currentUser!,
-        lastNight: selectedDate.subtract(const Duration(days: 1)),
+        lastNight: selectedDate,
         reason: reasonController.text.trim().isEmpty
             ? null
             : reasonController.text.trim(),
@@ -331,9 +469,158 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     }
   }
 
+  Future<void> _requestCancellationRefund(OneBookingDetails d) async {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    if (_currentUser == null) return;
+
+    final reasonController = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+          title: _RequestDialogTitle(
+            icon: Icons.cancel_outlined,
+            title: lang.t('cancel_refund_booking'),
+            color: const Color(0xFFD74A4A),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4F4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFFD6D6)),
+                  ),
+                  child: Text(
+                    lang.t('cancel_refund_message'),
+                    style: const TextStyle(
+                      color: Color(0xFF7A2E2E),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: lang.t('reason'),
+                    hintText: lang.t('cancel_refund_reason_hint'),
+                    alignLabelWithHint: true,
+                    filled: true,
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withOpacity(0.55),
+                    border: _requestInputBorder(),
+                    enabledBorder: _requestInputBorder(),
+                    focusedBorder: _requestInputBorder(
+                      const Color(0xFFD74A4A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF244B6B),
+                      side: const BorderSide(color: Color(0xFFE4EAF0)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(lang.t('cancel')),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      final reason = reasonController.text.trim();
+                      if (reason.isNotEmpty && reason.length < 10) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(lang.t('reason_too_short'))),
+                        );
+                        return;
+                      }
+                      Navigator.pop(ctx, true);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD74A4A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(lang.t('send')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+
+    if (submitted != true) {
+      reasonController.dispose();
+      return;
+    }
+
+    try {
+      await api.requestCancellationRefund(
+        bookingId: int.tryParse(d.id) ?? 0,
+        user: _currentUser!,
+        reason: reasonController.text.trim().isEmpty
+            ? null
+            : reasonController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(lang.t('cancel_refund_requested'))),
+      );
+      _refreshDetails();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${lang.t('error')}: $e')),
+      );
+    } finally {
+      reasonController.dispose();
+    }
+  }
+
+  OutlineInputBorder _requestInputBorder([
+    Color color = const Color(0xFFE4EAF0),
+  ]) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: color, width: 1.1),
+    );
+  }
+
   @override
   void dispose() {
-    _tab.dispose();
     super.dispose();
   }
 
@@ -442,9 +729,18 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+    final future = _future;
+
+    if (future == null) {
+      return const Scaffold(
+        body: SafeArea(
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
 
     return FutureBuilder<OneBookingDetails>(
-      future: _future,
+      future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -465,9 +761,21 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
         final d = snapshot.data!;
         final bool isConfirmed = d.validationStatus == 'confirmed';
         final status = d.validationStatus.toLowerCase();
-        final bool canPay =
-            d.paymentStatus != 'paid' && status != 'cancelled';
-        final bool canModify = status == 'confirmed';
+        final bool canPay = d.paymentStatus != 'paid' && status != 'cancelled';
+        final today = DateTime.now();
+        final todayDate = DateTime(today.year, today.month, today.day);
+        final checkInDate =
+            DateTime(d.firstNight.year, d.firstNight.month, d.firstNight.day);
+        final checkoutDate = DateTime(
+          d.lastNight.year,
+          d.lastNight.month,
+          d.lastNight.day,
+        ).add(const Duration(days: 1));
+        final bool isCurrentBooking = status == 'confirmed' &&
+            !todayDate.isBefore(checkInDate) &&
+            todayDate.isBefore(checkoutDate);
+        final bool canRequestCancellation =
+            status != 'cancelled' && todayDate.isBefore(checkInDate);
 
         if (_currentUser != null && _loadingReview && isConfirmed) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -487,9 +795,13 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
             d: d,
             lang: lang,
             canPay: canPay,
-            canModify: canModify,
+            canExtend: isCurrentBooking,
+            canRequestCancellation: canRequestCancellation,
             onPay: canPay ? () => _openPayment(d) : null,
-            onModify: canModify ? () => _requestBookingChange(d) : null,
+            onExtend: isCurrentBooking ? () => _requestBookingChange(d) : null,
+            onCancelRefund: canRequestCancellation
+                ? () => _requestCancellationRefund(d)
+                : null,
             reviewBuilder: isConfirmed ? () => _reviewSection(d) : null,
           ),
           if (isConfirmed)
@@ -508,66 +820,69 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
           ),
         ];
 
-        return DefaultTabController(
-          length: tabWidgets.length,
-          child: Scaffold(
-            backgroundColor: Colors.grey[100],
-            body: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Color(0xFF244B6B),
-                            size: 22,
+        return WillPopScope(
+          onWillPop: _handleSystemBack,
+          child: DefaultTabController(
+            length: tabWidgets.length,
+            child: Scaffold(
+              backgroundColor: Colors.grey[100],
+              body: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: Color(0xFF244B6B),
+                              size: 22,
+                            ),
+                            onPressed: _leaveBookingDetails,
                           ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          lang.t('booking_details'),
-                          style: const TextStyle(
-                            color: Color(0xFF244B6B),
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(width: 4),
+                          Text(
+                            lang.t('booking_details'),
+                            style: const TextStyle(
+                              color: Color(0xFF244B6B),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      color: Colors.white,
+                      child: TabBar(
+                        isScrollable: true,
+                        indicatorColor: const Color(0xFF244B6B),
+                        labelColor: const Color(0xFF244B6B),
+                        unselectedLabelColor: Colors.grey,
+                        indicatorWeight: 3,
+                        tabAlignment: TabAlignment.start,
+                        padding: EdgeInsets.zero,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
                         ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    color: Colors.white,
-                    child: TabBar(
-                      isScrollable: true,
-                      indicatorColor: const Color(0xFF244B6B),
-                      labelColor: const Color(0xFF244B6B),
-                      unselectedLabelColor: Colors.grey,
-                      indicatorWeight: 3,
-                      tabAlignment: TabAlignment.start,
-                      padding: EdgeInsets.zero,
-                      labelStyle: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                        ),
+                        tabs: tabWidgets,
                       ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 14,
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: tabViews,
                       ),
-                      tabs: tabWidgets,
                     ),
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: tabViews,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -578,21 +893,34 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
 }
 
 // ---------- Onglet 1 : Réservation ----------
+String _formatBookingMoney(BuildContext context, num amount, String currency) {
+  return CurrencyConverter.format(
+    amount.toDouble(),
+    from: currency,
+    to: context.read<CurrencyProvider>().currency,
+    rates: context.read<ExchangeRateProvider>().rates,
+  );
+}
+
 class _ReservationTab extends StatelessWidget {
   final OneBookingDetails d;
   final LanguageProvider lang;
   final bool canPay;
-  final bool canModify;
+  final bool canExtend;
+  final bool canRequestCancellation;
   final VoidCallback? onPay;
-  final VoidCallback? onModify;
+  final VoidCallback? onExtend;
+  final VoidCallback? onCancelRefund;
   final Widget Function()? reviewBuilder; // 👈 optionnel
   const _ReservationTab(
       {required this.d,
       required this.lang,
       required this.canPay,
-      required this.canModify,
+      required this.canExtend,
+      required this.canRequestCancellation,
       this.onPay,
-      this.onModify,
+      this.onExtend,
+      this.onCancelRefund,
       this.reviewBuilder});
 
   @override
@@ -604,30 +932,17 @@ class _ReservationTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (canPay || canModify) ...[
+        if (canPay) ...[
           const SizedBox(height: 12),
           CardSection(
             title: lang.t('account_actions'),
-            child: Row(
-              children: [
-                if (canPay)
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onPay,
-                      icon: const Icon(Icons.payment),
-                      label: Text(lang.t('pay_now')),
-                    ),
-                  ),
-                if (canPay && canModify) const SizedBox(width: 12),
-                if (canModify)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onModify,
-                      icon: const Icon(Icons.edit_calendar_outlined),
-                      label: Text(lang.t('update')),
-                    ),
-                  ),
-              ],
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onPay,
+                icon: const Icon(Icons.payment),
+                label: Text(lang.t('pay_now')),
+              ),
             ),
           ),
         ],
@@ -653,8 +968,10 @@ class _ReservationTab extends StatelessWidget {
                   DateFormat('dd MMM yyyy – HH:mm').format(d.createdAt)),
               InfoRowGlobal(lang.t('payment_status'), d.paymentStatusLabel,
                   badgeColor: d.paymentStatusColor),
-              InfoRow(lang.t('amount_paid'),
-                  "${NumberFormat('#,##0').format(d.paidAmount)} ${d.currency}"),
+              InfoRow(
+                lang.t('amount_paid'),
+                _formatBookingMoney(context, d.paidAmount, d.currency),
+              ),
               InfoRow(lang.t('reference'), d.reference ?? "N/A"),
               InfoRow("Source", d.source),
             ]),
@@ -680,8 +997,222 @@ class _ReservationTab extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 12),
+        _StayExtensionSection(
+          d: d,
+          lang: lang,
+          canExtend: canExtend,
+          onExtend: onExtend,
+        ),
+        const SizedBox(height: 12),
         if (reviewBuilder != null) reviewBuilder!(),
+        const SizedBox(height: 12),
+        _CancellationSection(
+          lang: lang,
+          canRequestCancellation: canRequestCancellation,
+          checkIn: d.firstNight,
+          paymentStatus: d.paymentStatus,
+          onCancelRefund: onCancelRefund,
+        ),
       ],
+    );
+  }
+}
+
+class _StayExtensionSection extends StatelessWidget {
+  final OneBookingDetails d;
+  final LanguageProvider lang;
+  final bool canExtend;
+  final VoidCallback? onExtend;
+
+  const _StayExtensionSection({
+    required this.d,
+    required this.lang,
+    required this.canExtend,
+    required this.onExtend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final checkout = d.lastNight.add(const Duration(days: 1));
+    final dailyTotal = d.nights > 0 ? d.price / d.nights : d.price;
+
+    return CardSection(
+      title: lang.t('extend_stay'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            canExtend
+                ? lang.t('extend_stay_available')
+                : lang.t('extend_stay_unavailable'),
+            style: TextStyle(color: Colors.grey[700], height: 1.35),
+          ),
+          const SizedBox(height: 8),
+          InfoRow(
+            lang.t('current_checkout'),
+            DateFormat('dd MMM yyyy').format(checkout),
+            boldValue: true,
+          ),
+          InfoRow(
+            lang.t('estimated_daily_rate'),
+            _formatBookingMoney(context, dailyTotal, d.currency),
+            boldValue: true,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: canExtend ? onExtend : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF244B6B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              icon: const Icon(Icons.edit_calendar_outlined),
+              label: Text(lang.t('request_stay_extension')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DialogInfoLine extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool bold;
+
+  const _DialogInfoLine({
+    required this.label,
+    required this.value,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          value,
+          style: TextStyle(
+            color: const Color(0xFF1D3550),
+            fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RequestDialogTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+
+  const _RequestDialogTitle({
+    required this.icon,
+    required this.title,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF101828),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CancellationSection extends StatelessWidget {
+  final LanguageProvider lang;
+  final bool canRequestCancellation;
+  final DateTime checkIn;
+  final String paymentStatus;
+  final VoidCallback? onCancelRefund;
+
+  const _CancellationSection({
+    required this.lang,
+    required this.canRequestCancellation,
+    required this.checkIn,
+    required this.paymentStatus,
+    required this.onCancelRefund,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedPaymentStatus = paymentStatus.toLowerCase();
+    final isPaid = normalizedPaymentStatus == 'paid' ||
+        normalizedPaymentStatus == 'partial';
+
+    return CardSection(
+      title: lang.t('cancel_refund_booking'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            canRequestCancellation
+                ? (isPaid
+                    ? lang.t('cancel_refund_available')
+                    : lang.t('cancel_booking_available'))
+                : lang.t('cancel_refund_unavailable'),
+            style: TextStyle(color: Colors.grey[700], height: 1.35),
+          ),
+          const SizedBox(height: 8),
+          InfoRow(
+            lang.t('check-in'),
+            DateFormat('dd MMM yyyy').format(checkIn),
+            boldValue: true,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: canRequestCancellation ? onCancelRefund : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD74A4A),
+                side: BorderSide(
+                  color: canRequestCancellation
+                      ? const Color(0xFFD74A4A)
+                      : Colors.grey.shade300,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              icon: const Icon(Icons.cancel_outlined),
+              label: Text(lang.t('request_cancellation_refund')),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

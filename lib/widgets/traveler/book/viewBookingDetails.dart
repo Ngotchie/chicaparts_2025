@@ -1,5 +1,10 @@
+import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/providers/currency_provider.dart';
+import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
+import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class ReviewReservationPage extends StatefulWidget {
   final DateTime checkIn;
@@ -7,6 +12,7 @@ class ReviewReservationPage extends StatefulWidget {
   final int adults;
   final int children;
   final double totalPrice;
+  final String currency;
   final double cleaningFees;
   final double cityTaxe;
 
@@ -17,6 +23,7 @@ class ReviewReservationPage extends StatefulWidget {
     required this.adults,
     required this.children,
     required this.totalPrice,
+    this.currency = 'EUR',
     required this.cleaningFees,
     required this.cityTaxe,
   });
@@ -30,88 +37,99 @@ class _ReviewReservationPageState extends State<ReviewReservationPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔢 Calcul des frais de service (10% du prix de base)
-    double chicapartsFees = widget.totalPrice * 0.10;
-    double finalPrice = widget.totalPrice +
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    final selectedCurrency = context.watch<CurrencyProvider>().currency;
+    final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    final chicapartsFees = widget.totalPrice * 0.10;
+    final finalPrice = widget.totalPrice +
         widget.cleaningFees +
         widget.cityTaxe +
         chicapartsFees;
+    String money(double amount) => CurrencyConverter.format(
+          amount,
+          from: widget.currency,
+          to: selectedCurrency,
+          rates: exchangeRates,
+        );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("📝 Review Your Booking",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text(
+          lang.t('review_booking'),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📅 Dates sélectionnées
-            _buildDetailRow("📆 Booking Date", _formatDate(DateTime.now())),
-            _buildDetailRow("🏁 Check-in", _formatDate(widget.checkIn)),
-            _buildDetailRow("📤 Check-out", _formatDate(widget.checkOut)),
+            _buildDetailRow(
+                lang.t('booking_date'), _formatDate(DateTime.now())),
+            _buildDetailRow(lang.t('check_in'), _formatDate(widget.checkIn)),
+            _buildDetailRow(lang.t('check_out'), _formatDate(widget.checkOut)),
             const SizedBox(height: 10),
-
-            // 👥 Voyageurs
-            _buildDetailRow("👨‍👩‍👧‍👦 Travelers",
-                "${widget.adults} Adults, ${widget.children} Children"),
+            _buildDetailRow(
+              lang.t('travelers'),
+              "${widget.adults} ${lang.t('adults')}, ${widget.children} ${lang.t('children')}",
+            ),
             const SizedBox(height: 10),
-
             if (_arrivalTime != null)
-              _buildDetailRow("⏰ Arrival Time", _formatTime(_arrivalTime!)),
+              _buildDetailRow(
+                  lang.t('arrival_time'), _formatTime(_arrivalTime!)),
             const SizedBox(height: 10),
-            // ⏰ Heure d'arrivée (modifiable)
-            _buildArrivalTimeSelector(context),
+            _buildArrivalTimeSelector(context, lang),
             const SizedBox(height: 20),
-
-            // 💰 Détail des prix
-            const Text("💰 Payment Summary",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              lang.t('payment_summary'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
             _buildDetailRow(
-                "🏠 Base Price", "\$${widget.totalPrice.toStringAsFixed(2)}"),
-            _buildDetailRow("🧹 Cleaning Fees",
-                "\$${widget.cleaningFees.toStringAsFixed(2)}"),
+              lang.t('base_price'),
+              money(widget.totalPrice),
+            ),
             _buildDetailRow(
-                "🏙 City Taxe", "\$${widget.cityTaxe.toStringAsFixed(2)}"),
-            _buildDetailRow("🏡 Chicaparts Fees (10%)",
-                "\$${chicapartsFees.toStringAsFixed(2)}"),
+              lang.t('cleaning_fees'),
+              money(widget.cleaningFees),
+            ),
+            _buildDetailRow(
+              lang.t('city_taxe'),
+              money(widget.cityTaxe),
+            ),
+            _buildDetailRow(
+              "${lang.t('chicaparts_fees')} (10%)",
+              money(chicapartsFees),
+            ),
             Divider(thickness: 1, color: Colors.grey[400]),
-            _buildDetailRow("💵 Total", "\$${finalPrice.toStringAsFixed(2)}",
-                isTotal: true),
-
+            _buildDetailRow(
+              lang.t('total_price'),
+              money(finalPrice),
+              isTotal: true,
+            ),
             const SizedBox(height: 30),
-
-            // ✅ Bouton "Proceed to Payment"
             ElevatedButton(
               onPressed: () {
-                // Aller à la page de paiement
-                BookingDetails1 booking = BookingDetails1(
+                BookingDetails1(
                   checkIn: widget.checkIn,
                   checkOut: widget.checkOut,
                   adults: widget.adults,
                   children: widget.children,
                   totalPrice: widget.totalPrice,
+                  currency: widget.currency,
                   cleaningFees: widget.cleaningFees,
                   cityTaxe: widget.cityTaxe,
                 );
-
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(
-                //     builder: (context) =>
-                //         BillingInfoPage(bookingDetails: booking),
-                //   ),
-                // );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF244B6B),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              child: const Center(
-                child: Text("Proceed to Payment",
-                    style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: Center(
+                child: Text(
+                  lang.t('proceed_to_payment'),
+                  style: const TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
             ),
           ],
@@ -120,42 +138,47 @@ class _ReviewReservationPageState extends State<ReviewReservationPage> {
     );
   }
 
-  // 📌 Fonction pour formater la date
   String _formatDate(DateTime date) {
     return DateFormat("dd MMMM yyyy").format(date);
   }
 
-  // 📌 Fonction pour formater l'heure
   String _formatTime(TimeOfDay time) {
     return time.format(context);
   }
 
-  // 📌 Fonction pour construire une ligne de détail
   Widget _buildDetailRow(String label, String value, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: isTotal ? 18 : 16,
-                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: isTotal ? 18 : 16,
-                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                  color: isTotal ? Colors.green : Colors.black)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: isTotal ? 18 : 16,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isTotal ? 18 : 16,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? Colors.green : Colors.black,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // 📌 Sélecteur d'heure d'arrivée
-  Widget _buildArrivalTimeSelector(BuildContext context) {
+  Widget _buildArrivalTimeSelector(
+    BuildContext context,
+    LanguageProvider lang,
+  ) {
     return InkWell(
       onTap: () async {
-        TimeOfDay? pickedTime = await showTimePicker(
+        final pickedTime = await showTimePicker(
           context: context,
           initialTime: _arrivalTime ?? const TimeOfDay(hour: 14, minute: 0),
         );
@@ -171,12 +194,14 @@ class _ReviewReservationPageState extends State<ReviewReservationPage> {
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("⏰ Select Arrival Time",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            Icon(Icons.access_time, color: Colors.blueAccent),
+            Text(
+              lang.t('arrival_time'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const Icon(Icons.access_time, color: Colors.blueAccent),
           ],
         ),
       ),
@@ -190,6 +215,7 @@ class BookingDetails1 {
   final int adults;
   final int children;
   final double totalPrice;
+  final String currency;
   final double cleaningFees;
   final double cityTaxe;
   final double chicapartsFees;
@@ -200,6 +226,7 @@ class BookingDetails1 {
     required this.adults,
     required this.children,
     required this.totalPrice,
+    this.currency = 'EUR',
     required this.cleaningFees,
     required this.cityTaxe,
   }) : chicapartsFees = totalPrice * 0.10;

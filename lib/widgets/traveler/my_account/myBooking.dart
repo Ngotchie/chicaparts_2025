@@ -1,13 +1,20 @@
 import 'dart:convert';
+
 import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
 import 'package:chicaparts_partner/models/model_booking.dart';
+import 'package:chicaparts_partner/models/user/user.dart';
+import 'package:chicaparts_partner/providers/currency_provider.dart';
+import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/utils/currency_converter.dart';
+import 'package:chicaparts_partner/widgets/traveler/common/login_required_state.dart';
+import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:chicaparts_partner/models/user/user.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MyReservationsPage extends StatefulWidget {
   const MyReservationsPage({super.key});
@@ -18,11 +25,10 @@ class MyReservationsPage extends StatefulWidget {
 
 class _MyReservationsPageState extends State<MyReservationsPage> {
   User? user;
-
-  ApiBooking apiResa = ApiBooking();
-
-  late Future<List<Booking>> _allBookings;
+  final ApiBooking apiResa = ApiBooking();
+  Future<List<Booking>> _allBookings = Future.value([]);
   Booking? _currentReservation;
+  bool _isLoadingUser = true;
 
   @override
   void initState() {
@@ -30,218 +36,201 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     loadUserAndReservations();
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 CHARGEMENT UTILISATEUR + RÉSERVATIONS
-  // -----------------------------------------------------------------------------
   Future<void> loadUserAndReservations() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user');
 
     if (userJson != null && userJson.isNotEmpty) {
       user = User.fromJson(jsonDecode(userJson));
-
-      setState(() {
-        _allBookings = _fetchAllBookings();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingUser = false;
+          _allBookings = _fetchAllBookings();
+        });
+      }
+    } else if (mounted) {
+      setState(() => _isLoadingUser = false);
     }
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 Récupère toutes les réservations + détecte la réservation en cours
-  // -----------------------------------------------------------------------------
   Future<List<Booking>> _fetchAllBookings() async {
     if (user == null) return [];
 
     final list = await apiResa.getUserReservations(user!);
-
-    // Tri descendant par date de création
     list.sort((a, b) {
-      final da = DateTime.tryParse(a.bookedAt ?? '') ?? DateTime(2000);
-      final db = DateTime.tryParse(b.bookedAt ?? '') ?? DateTime(2000);
+      final da = DateTime.tryParse(a.bookedAt) ?? DateTime(2000);
+      final db = DateTime.tryParse(b.bookedAt) ?? DateTime(2000);
       return db.compareTo(da);
     });
 
-    // Détecter la réservation en cours
     _detectCurrentReservation(list);
-
     return list;
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 Détection automatique de la réservation en cours
-  // -----------------------------------------------------------------------------
   void _detectCurrentReservation(List<Booking> all) {
     final now = DateTime.now();
+    Booking? current;
 
-    for (var b in all) {
-      final start = DateTime.tryParse(b.firstNight ?? '');
-      final end = DateTime.tryParse(b.lastNight ?? '');
+    for (final booking in all) {
+      final start = DateTime.tryParse(booking.firstNight);
+      final end = DateTime.tryParse(booking.lastNight);
 
       if (start != null && end != null) {
         if (now.isAfter(start) &&
             now.isBefore(end.add(const Duration(days: 1)))) {
-          setState(() => _currentReservation = b);
-          return;
+          current = booking;
+          break;
         }
       }
     }
 
-    // Sinon aucune en cours
-    setState(() => _currentReservation = null);
+    if (mounted) setState(() => _currentReservation = current);
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 Refresh global
-  // -----------------------------------------------------------------------------
   Future<void> _loadAllBookings() async {
-    setState(() {
-      _allBookings = _fetchAllBookings();
-    });
+    setState(() => _allBookings = _fetchAllBookings());
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 Changer les dates (TODO ou navigation)
-  // -----------------------------------------------------------------------------
-  void _changeDates(Booking b) {
-    // TODO : ouvrir un date picker / nouvelle page
-    print("Changer les dates de : ${b.id}");
+  Future<void> _changeDates(Booking booking) async {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    if (booking.validationStatus.trim().toLowerCase() != 'confirmed') {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          final colors = Theme.of(dialogContext).colorScheme;
+          return AlertDialog(
+            icon: Icon(
+              Icons.info_outline_rounded,
+              color: colors.primary,
+              size: 34,
+            ),
+            title: Text(
+              lang.currentLang == 'fr'
+                  ? 'Modification indisponible'
+                  : 'Changes unavailable',
+              textAlign: TextAlign.center,
+            ),
+            content: Text(
+              lang.currentLang == 'fr'
+                  ? 'Les dates peuvent être modifiées uniquement lorsque la réservation est confirmée. Le statut actuel de cette réservation ne permet pas encore cette action.'
+                  : 'Dates can only be changed once the booking is confirmed. The current booking status does not allow this action yet.',
+              textAlign: TextAlign.center,
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(lang.t('close')),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    await Navigator.pushNamed(
+      context,
+      '/reservations/${booking.id}',
+    );
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 BUILD
-  // -----------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            Container(height: 1, color: Colors.grey[300]),
+            _buildHeader(lang),
             Expanded(
-              child: user == null
-                  ? Center(child: Text(lang.t('booking_connect_text')))
-                  : RefreshIndicator(
-                      onRefresh: _loadAllBookings,
-                      child: CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          // ------------------------------------------------------------------
-                          // 🔥 RÉSERVATION EN COURS (grosse carte)
-                          // ------------------------------------------------------------------
-                          if (_currentReservation != null)
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                child: ReservationInProgressCard(
-                                  title:
-                                      _currentReservation!.accommodation ?? "—",
-                                  city: _currentReservation!.city ?? "",
-                                  firstNight: DateTime.parse(
-                                      _currentReservation!.firstNight),
-                                  lastNight: DateTime.parse(
-                                      _currentReservation!.lastNight),
-                                  currency: _currentReservation!.currency,
-                                  totalAmount: _currentReservation!.price ?? 0,
-                                  travelers: (_currentReservation!.adult ?? 1) +
-                                      (_currentReservation!.child ?? 0),
-                                  paymentStatus:
-                                      _currentReservation!.validationStatus,
-                                  statusLabel:
-                                      _currentReservation!.validationStatus ==
-                                              "confirmed"
-                                          ? lang.t('confirmed')
-                                          : lang.t('waitting'),
-                                  imageUrl: _currentReservation!.img,
-                                  onChangeDates: () =>
-                                      _changeDates(_currentReservation!),
-                                  onTip: () => Navigator.pushNamed(context,
-                                      '/tips/${_currentReservation!.id}'),
-                                  onMore: () => Navigator.pushNamed(
-                                    context,
-                                    '/reservations/${_currentReservation!.id}',
-                                  ),
-                                  onReview: () {},
-                                ),
-                              ),
-                            ),
-
-                          // ------------------------------------------------------------------
-                          // 🔹 CHARGEMENT / ERREUR / LISTE
-                          // ------------------------------------------------------------------
-                          FutureBuilder<List<Booking>>(
+              child: _isLoadingUser
+                  ? _buildLoadingList()
+                  : user == null
+                      ? LoginRequiredState(
+                          message: lang.t('booking_connect_text'),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadAllBookings,
+                          child: FutureBuilder<List<Booking>>(
                             future: _allBookings,
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
-                                return const SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Center(
-                                      child: CircularProgressIndicator()),
-                                );
+                                return _buildLoadingList();
                               }
 
                               if (snapshot.hasError) {
-                                return SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Center(
-                                    child: Text(
-                                      "${lang.t('error')}: ${lang.t('error_network')}",
-                                      textAlign: TextAlign.center,
+                                return ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    _buildMessageState(
+                                      icon: Icons.wifi_off_outlined,
+                                      title: lang.t('error'),
+                                      message: lang.t('error_network'),
                                     ),
-                                  ),
+                                  ],
                                 );
                               }
 
                               final bookings = snapshot.data ?? [];
-
-                              // Retirer la réservation en cours
-                              final list = bookings.where((b) {
+                              final otherBookings = bookings.where((booking) {
                                 if (_currentReservation == null) return true;
-                                return b.id != _currentReservation!.id;
+                                return booking.id != _currentReservation!.id;
                               }).toList();
 
-                              if (list.isEmpty) {
-                                return SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Center(
-                                    child: Text(lang.t('no_booking')),
-                                  ),
+                              if (_currentReservation == null &&
+                                  otherBookings.isEmpty) {
+                                return ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    _buildMessageState(
+                                      icon: Icons.event_busy_outlined,
+                                      title: lang.t('no_booking'),
+                                      message: lang.t('booking_empty'),
+                                    ),
+                                  ],
                                 );
                               }
 
-                              return SliverList.builder(
-                                itemCount: list.length,
-                                itemBuilder: (_, i) {
-                                  final b = list[i];
-                                  final first = DateTime.parse(b.firstNight);
-                                  final last = DateTime.parse(b.lastNight);
-
-                                  return BookingTile(
-                                    title: b.accommodation,
-                                    city: b.city,
-                                    dates:
-                                        "${DateFormat('dd MMM').format(first)} – ${DateFormat('dd MMM yyyy').format(last)}",
-                                    status: b.validationStatus,
-                                    imageUrl: b.img,
-                                    onTap: () => Navigator.pushNamed(
-                                      context,
-                                      '/reservations/${b.id}',
+                              return ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                children: [
+                                  if (_currentReservation != null) ...[
+                                    _buildSectionLabel(
+                                        lang.t('active_booking')),
+                                    _buildBookingCard(
+                                      _currentReservation!,
+                                      highlighted: true,
+                                      onChangeDates: () =>
+                                          _changeDates(_currentReservation!),
+                                      onTip: () => Navigator.pushNamed(
+                                        context,
+                                        '/tips/${_currentReservation!.id}',
+                                      ),
                                     ),
-                                  );
-                                },
+                                    const SizedBox(height: 18),
+                                  ],
+                                  ...otherBookings.map(
+                                    (booking) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 12),
+                                      child: _buildBookingCard(booking),
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           ),
-
-                          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                        ],
-                      ),
-                    ),
+                        ),
             ),
           ],
         ),
@@ -249,47 +238,371 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     );
   }
 
-  // -----------------------------------------------------------------------------
-  // 🔹 HEADER
-  // -----------------------------------------------------------------------------
-  Widget _buildHeader() {
-    final lang = Provider.of<LanguageProvider>(context, listen: false);
+  Widget _buildHeader(LanguageProvider lang) {
+    final colors = Theme.of(context).colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 12, right: 8),
+      padding: const EdgeInsets.fromLTRB(8, 12, 16, 14),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new,
-                    color: Color(0xFF244B6B)),
-                onPressed: () => Navigator.pop(context),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "📑 ${lang.t('my_bookings')}",
-                    style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF244B6B)),
+          IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: colors.primary),
+            onPressed: _leaveBookings,
+          ),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.event_note_outlined, color: colors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lang.t('my_bookings'),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onSurface,
                   ),
-                  const SizedBox(height: 2),
-                  Text(lang.t('my_bookings_text'),
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  lang.t('my_bookings_text'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.sync, size: 28, color: Color(0xFF244B6B)),
-            onPressed: () => showSyncReservationsSheet(context, apiResa, user!),
-          )
+            tooltip: lang.t('sync_my_resa'),
+            icon: Icon(
+              Icons.sync,
+              size: 26,
+              color: user == null ? colors.onSurfaceVariant : colors.primary,
+            ),
+            onPressed: user == null
+                ? null
+                : () => showSyncReservationsSheet(context, apiResa, user!),
+          ),
         ],
       ),
     );
+  }
+
+  void _leaveBookings() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      navigator.pushReplacementNamed('/my-account');
+    }
+  }
+
+  Widget _buildSectionLabel(String title) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          color: colors.onSurface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(
+    Booking booking, {
+    bool highlighted = false,
+    VoidCallback? onChangeDates,
+    VoidCallback? onTip,
+  }) {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    final colors = Theme.of(context).colorScheme;
+    final amount = _money(booking.price, booking.currency);
+    final first = _parseDate(booking.firstNight);
+    final checkout = _checkoutDate(booking.lastNight);
+    final dates =
+        '${DateFormat('dd MMM').format(first)} - ${DateFormat('dd MMM yyyy').format(checkout)}';
+    final statusColor = _statusColor(booking.validationStatus);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => Navigator.pushNamed(context, '/reservations/${booking.id}'),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color:
+                highlighted ? const Color(0xFF21A35B) : colors.outlineVariant,
+            width: highlighted ? 1.3 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(8)),
+                  child: OptimizedNetworkImage(
+                    imageUrl: booking.img,
+                    width: double.infinity,
+                    height: highlighted ? 150 : 124,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 720,
+                    memCacheHeight: 420,
+                    maxWidthDiskCache: 900,
+                    maxHeightDiskCache: 540,
+                    errorWidget: const Icon(
+                      Icons.apartment_outlined,
+                      size: 42,
+                      color: Color(0xFF98A2B3),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    booking.accommodation.isNotEmpty
+                        ? booking.accommodation
+                        : lang.t('accommodation'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _InfoLine(
+                    icon: Icons.location_on_outlined,
+                    text: booking.city.isNotEmpty ? booking.city : '-',
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InfoLine(
+                          icon: Icons.calendar_month_outlined,
+                          text: dates,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusPill(
+                        label: _statusLabel(booking.validationStatus, lang),
+                        color: statusColor,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          amount,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          '/reservations/${booking.id}',
+                        ),
+                        icon: const Icon(Icons.chevron_right, size: 18),
+                        label: Text(lang.t('details')),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (highlighted) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onChangeDates,
+                            icon: const Icon(Icons.calendar_month_outlined,
+                                size: 18),
+                            label: Text(lang.t('update')),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: colors.primary,
+                              side: BorderSide(color: colors.outlineVariant),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: onTip,
+                            icon: const Icon(Icons.payments_outlined, size: 18),
+                            label: Text(lang.t('tip')),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colors.primary,
+                              foregroundColor: colors.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingList() {
+    final colors = Theme.of(context).colorScheme;
+
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: colors.surfaceContainerHighest,
+          highlightColor: colors.surfaceContainer,
+          child: Container(
+            height: index == 0 ? 250 : 210,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMessageState({
+    required IconData icon,
+    required String title,
+    required String message,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: colors.primary.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 34, color: colors.primary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.onSurfaceVariant, height: 1.35),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _money(num amount, String currency) {
+    final selectedCurrency = context.watch<CurrencyProvider>().currency;
+    final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    return CurrencyConverter.format(
+      amount.toDouble(),
+      from: currency,
+      to: selectedCurrency,
+      rates: exchangeRates,
+    );
+  }
+
+  DateTime _parseDate(String value) {
+    return DateTime.tryParse(value) ?? DateTime(1970);
+  }
+
+  DateTime _checkoutDate(String lastNight) {
+    return _parseDate(lastNight).add(const Duration(days: 1));
+  }
+
+  Color _statusColor(String status) {
+    final normalized = status.toLowerCase();
+    if (normalized == 'confirmed' ||
+        normalized == 'accepted' ||
+        normalized == 'paid') {
+      return const Color(0xFF21A35B);
+    }
+    if (normalized == 'expired' ||
+        normalized == 'cancelled' ||
+        normalized == 'canceled') {
+      return const Color(0xFFE53935);
+    }
+    return const Color(0xFFF79009);
+  }
+
+  String _statusLabel(String status, LanguageProvider lang) {
+    final normalized = status.toLowerCase();
+    if (normalized == 'confirmed' || normalized == 'accepted') {
+      return lang.t('confirmed');
+    }
+    if (normalized == 'expired') return lang.t('expired');
+    return lang.t('waitting').trim();
   }
 
   void showSyncReservationsSheet(
@@ -300,7 +613,7 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
@@ -310,3 +623,57 @@ class _MyReservationsPageState extends State<MyReservationsPage> {
     );
   }
 }
+
+class _InfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: colors.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+

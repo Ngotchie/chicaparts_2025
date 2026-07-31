@@ -7,6 +7,7 @@ import 'package:chicaparts_partner/providers/language_provider.dart';
 import 'package:chicaparts_partner/services/favorite_repository.dart';
 import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
+import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -135,13 +136,15 @@ class MethodsTraveler {
               // 📷 Image à gauche
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  stay.imageUrl,
+                child: OptimizedNetworkImage(
+                  imageUrl: stay.thumbnailUrl,
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.broken_image, size: 50),
+                  memCacheWidth: 240,
+                  memCacheHeight: 240,
+                  maxWidthDiskCache: 360,
+                  maxHeightDiskCache: 360,
                 ),
               ),
               const SizedBox(width: 10),

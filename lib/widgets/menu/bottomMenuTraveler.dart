@@ -1,4 +1,5 @@
 import 'package:chicaparts_partner/models/traveler/model_accommodation_traveler.dart';
+import 'package:chicaparts_partner/widgets/traveler/chatbot/chatbot_sheet.dart';
 import 'package:chicaparts_partner/widgets/traveler/favorites/favorites.dart';
 import 'package:chicaparts_partner/widgets/traveler/home.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/myAccount.dart';
@@ -22,7 +23,6 @@ class BottomMenuTraveler extends StatefulWidget {
 class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
   int _selectedIndex = 0;
   late List<Stay> search_result;
-  late List<Widget> _pages;
 
   @override
   void initState() {
@@ -30,12 +30,6 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
     search_result = widget.results; // ✅ ICI c'est bon
     _selectedIndex = widget.index;
     // Liste des pages associées aux onglets
-    _pages = [
-      const HomePage(),
-      SearchPage(results: search_result),
-      const FavoritesPages(),
-      const MyAccountPage()
-    ];
   }
 
   final String phoneNumber =
@@ -51,12 +45,32 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
     }
   }
 
+  void _openAssistant() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const ChatbotSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+    final colors = Theme.of(context).colorScheme;
+    final pages = <Widget>[
+      const HomePage(),
+      SearchPage(results: search_result),
+      const FavoritesPages(),
+      const MyAccountPage(),
+    ];
+
     return Stack(children: [
       Scaffold(
-        body: _pages[_selectedIndex], // Afficher la page sélectionnée
+        body: pages[_selectedIndex], // Afficher la page sélectionnée
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) {
@@ -64,11 +78,10 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
               _selectedIndex = index;
             });
           },
-          backgroundColor:
-              const Color(0xFF244B6B), // Bleu de la charte graphique
+          backgroundColor: colors.primary,
           selectedItemColor:
               const Color(0xFFFFC107), // Icône sélectionnée en blanc
-          unselectedItemColor: Colors.white,
+          unselectedItemColor: colors.onPrimary,
           // Icône non sélectionnée en jaune
           showUnselectedLabels:
               true, // Afficher les labels des icônes non sélectionnées
@@ -98,11 +111,26 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
       Positioned(
         bottom: 80, // légèrement au-dessus du bottom nav
         right: 16,
-        child: FloatingActionButton(
-          onPressed: _openWhatsApp,
-          backgroundColor: Colors.green,
-          mini: true,
-          child: const Icon(FontAwesomeIcons.whatsapp, color: Colors.white),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton(
+              heroTag: 'assistant_fab',
+              onPressed: _openAssistant,
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+              mini: true,
+              child: const Icon(Icons.smart_toy_outlined),
+            ),
+            const SizedBox(width: 10),
+            FloatingActionButton(
+              heroTag: 'whatsapp_fab',
+              onPressed: _openWhatsApp,
+              backgroundColor: Colors.green,
+              mini: true,
+              child: const Icon(FontAwesomeIcons.whatsapp, color: Colors.white),
+            ),
+          ],
         ),
       ),
     ]);

@@ -16,6 +16,9 @@ class CurrencyConverter {
     required String to,
     required Map<String, double> rates,
   }) {
+    from = _normalizeCurrency(from);
+    to = _normalizeCurrency(to);
+
     if (from == to) return amount;
 
     final fromRate = rates[from] ?? 1.0;
@@ -33,10 +36,19 @@ class CurrencyConverter {
     required String to,
     required Map<String, double> rates,
   }) {
+    from = _normalizeCurrency(from);
+    to = _normalizeCurrency(to);
+
     final converted = convert(amount: amount, from: from, to: to, rates: rates);
     final formatted = to != "XAF"
         ? NumberFormat("#,##0.00", "fr_FR").format(converted)
         : NumberFormat("#,##0", "fr_FR").format(converted.round());
     return "$to $formatted";
+  }
+
+  static String _normalizeCurrency(String currency) {
+    final value = currency.trim().toUpperCase();
+    if (value == 'FCFA' || value == 'CFA' || value == 'XOF') return 'XAF';
+    return value;
   }
 }

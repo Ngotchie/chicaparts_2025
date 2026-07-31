@@ -49,6 +49,7 @@ class ApiBooking {
           book["propId"] ?? 0,
           "",
           "",
+          false,
           book["multiplier"] ?? "Not defined",
         );
 

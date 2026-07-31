@@ -33,18 +33,52 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-   <script>
+  <script src="env.js"></script>
+  <script>
     var serviceWorkerVersion = '{{flutter_service_worker_version}}';
     var scriptLoaded = false;
+    var googleMapsLoaded = false;
+
+    function loadGoogleMapsJs(callback) {
+      if (googleMapsLoaded || (window.google && window.google.maps)) {
+        googleMapsLoaded = true;
+        callback();
+        return;
+      }
+
+      var apiKey = window.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn('GOOGLE_MAPS_API_KEY is missing. Google Maps will not render.');
+        callback();
+        return;
+      }
+
+      var scriptTag = document.createElement('script');
+      scriptTag.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey);
+      scriptTag.async = true;
+      scriptTag.defer = true;
+      scriptTag.onload = function () {
+        googleMapsLoaded = true;
+        callback();
+      };
+      scriptTag.onerror = function () {
+        console.warn('Failed to load Google Maps JavaScript API.');
+        callback();
+      };
+      document.head.append(scriptTag);
+    }
+
     function loadMainDartJs() {
       if (scriptLoaded) {
         return;
       }
       scriptLoaded = true;
-      var scriptTag = document.createElement('script');
-      scriptTag.src = 'main.dart.js';
-      scriptTag.type = 'application/javascript';
-      document.body.append(scriptTag);
+      loadGoogleMapsJs(function () {
+        var scriptTag = document.createElement('script');
+        scriptTag.src = 'main.dart.js';
+        scriptTag.type = 'application/javascript';
+        document.body.append(scriptTag);
+      });
     }
 
     if ('serviceWorker' in navigator) {

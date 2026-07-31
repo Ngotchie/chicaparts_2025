@@ -15,6 +15,7 @@ import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenuTraveler.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/destinations.dart';
+import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/popular.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/setting.dart';
 import 'package:chicaparts_partner/widgets/traveler/search/searchPage.dart';
@@ -39,7 +40,10 @@ class _HomePageState extends State<HomePage> {
   late ScrollController _scrollController;
   late Timer _timer;
   List<Destination> destinations = [];
+  final Set<String> _readyDestinationImages = {};
+  bool _isLoadingDestinations = true;
   List<Stay> stays = [];
+  bool _isLoadingStays = true;
   final apiAcc = ApiAccommodationTraveler();
   String userName = "Invité";
   final bool hasNotification = true; // À récupérer dynamiquement depuis l'API
@@ -58,16 +62,16 @@ class _HomePageState extends State<HomePage> {
   AccommodationFilter? currentFilter;
 
   // Filtres
-  int nbAdultes = 1;
+  int nbAdultes = 0;
   int nbEnfants = 0;
-  int nbChambres = 1;
-  int nbLits = 1;
+  int nbChambres = 0;
+  int nbLits = 0;
   String? typeLogement;
   DateTime? startDate;
   DateTime? endDate;
-  bool wifi = true;
+  bool wifi = false;
   bool ascenseur = false;
-  bool parking = true;
+  bool parking = false;
   bool entirePlace = false;
   bool disabledAccess = false;
 
@@ -85,7 +89,8 @@ class _HomePageState extends State<HomePage> {
     loadStays();
     _scrollController = ScrollController();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_scrollController.hasClients &&
+      if (_visibleDestinations.length > 1 &&
+          _scrollController.hasClients &&
           _scrollController.position.haveDimensions) {
         double nextOffset = _scrollController.offset + 200;
 
@@ -130,24 +135,150 @@ class _HomePageState extends State<HomePage> {
   void loadDestinations() async {
     try {
       List<Destination> data = await apiAcc.fetchDestinations();
+      await _warmUpDestinationImages(data.take(6));
+      if (!mounted) return;
       setState(() {
         destinations = data;
+        _isLoadingDestinations = false;
       });
+      _precacheDestinationImages(data.skip(6).toList());
     } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingDestinations = false);
+      }
       print("Erreur: $e");
     }
+  }
+
+  List<Destination> get _visibleDestinations {
+    return destinations
+        .where((destination) =>
+            destination.imageUrl.trim().isNotEmpty &&
+            _readyDestinationImages.contains(destination.imageUrl))
+        .toList();
   }
 
   // Charger les hébergements populaires
   void loadStays() async {
     try {
       List<Stay> data = await apiAcc.fetchStays();
+      await _warmUpPopularStayImages(data);
+      if (!mounted) return;
       setState(() {
         stays = data;
+        _isLoadingStays = false;
       });
+      _precachePopularStayImages(data.skip(6).toList());
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStays = false;
+        });
+      }
       print("Erreur: $e");
     }
+  }
+
+  Future<void> _warmUpDestinationImages(Iterable<Destination> data) async {
+    final futures = data.map((destination) async {
+      final imageUrl = destination.imageUrl;
+      if (imageUrl.trim().isEmpty) return;
+
+      try {
+        await precacheImage(
+          OptimizedNetworkImage.provider(
+            imageUrl,
+            maxWidth: 360,
+            maxHeight: 420,
+          ),
+          context,
+        );
+        if (mounted) {
+          setState(() => _readyDestinationImages.add(imageUrl));
+        } else {
+          _readyDestinationImages.add(imageUrl);
+        }
+      } catch (_) {}
+    }).toList();
+
+    if (futures.isEmpty) return;
+
+    try {
+      await Future.wait(futures).timeout(const Duration(milliseconds: 1200));
+    } on TimeoutException {
+      // Keep the skeleton until each image finishes and updates the ready set.
+    }
+  }
+
+  void _precacheDestinationImages(List<Destination> data) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      for (final destination in data.take(6)) {
+        final imageUrl = destination.imageUrl;
+        if (imageUrl.trim().isEmpty) continue;
+
+        precacheImage(
+          OptimizedNetworkImage.provider(
+            imageUrl,
+            maxWidth: 360,
+            maxHeight: 420,
+          ),
+          context,
+        ).then((_) {
+          if (!mounted) return;
+          setState(() => _readyDestinationImages.add(imageUrl));
+        }).catchError((_) {});
+      }
+    });
+  }
+
+  Future<void> _warmUpPopularStayImages(List<Stay> data) async {
+    final futures = data.take(6).map((stay) {
+      final imageUrl = stay.thumbnailUrl.trim().isNotEmpty
+          ? stay.thumbnailUrl
+          : stay.imageUrl;
+      if (imageUrl.trim().isEmpty) return Future<void>.value();
+
+      return precacheImage(
+        OptimizedNetworkImage.provider(
+          imageUrl,
+          maxWidth: 520,
+          maxHeight: 360,
+        ),
+        context,
+      ).catchError((_) {});
+    }).toList();
+
+    if (futures.isEmpty) return;
+
+    try {
+      await Future.wait(futures).timeout(const Duration(milliseconds: 900));
+    } on TimeoutException {
+      // Do not block the home page if a thumbnail is slow.
+    }
+  }
+
+  void _precachePopularStayImages(List<Stay> data) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      for (final stay in data.take(8)) {
+        final imageUrl = stay.thumbnailUrl.trim().isNotEmpty
+            ? stay.thumbnailUrl
+            : stay.imageUrl;
+        if (imageUrl.trim().isEmpty) continue;
+
+        precacheImage(
+          OptimizedNetworkImage.provider(
+            imageUrl,
+            maxWidth: 520,
+            maxHeight: 360,
+          ),
+          context,
+        );
+      }
+    });
   }
 
   void getSuggestion(query) async {
@@ -182,8 +313,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,8 +382,11 @@ class _HomePageState extends State<HomePage> {
               child: TextField(
                 controller: searchController,
                 onChanged: (value) {
+                  selectedLat = null;
+                  selectedLon = null;
                   getSuggestion(value);
                 },
+                onSubmitted: (_) => applyFiltersAndFetchResults(),
                 decoration: InputDecoration(
                   hintText: lang.t("text_search_bar"),
                   prefixIcon: const Icon(Icons.search),
@@ -259,7 +395,7 @@ class _HomePageState extends State<HomePage> {
                     onPressed: openFilterModal,
                   ),
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: colors.surfaceContainerHighest.withOpacity(0.65),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -290,19 +426,23 @@ class _HomePageState extends State<HomePage> {
                           currentFilter = AccommodationFilter(
                             lon: lon,
                             lat: lat,
+                            city: place['text'] ?? place['place_name'],
                           );
                         } else {
                           currentFilter = AccommodationFilter(
                             lon: lon,
                             lat: lat,
+                            city: place['text'] ?? place['place_name'],
                             typeAcc: currentFilter!.typeAcc,
                             wifi: currentFilter!.wifi,
+                            hasParking: currentFilter!.hasParking,
                             disabledAccess: currentFilter!.disabledAccess,
                             hasElevator: currentFilter!.hasElevator,
                             entirePlace: currentFilter!.entirePlace,
                             nbAdult: currentFilter!.nbAdult,
                             nbChild: currentFilter!.nbChild,
                             nbBed: currentFilter!.nbBed,
+                            nbBedrooms: currentFilter!.nbBedrooms,
                             startDate: currentFilter!.startDate,
                             endDate: currentFilter!.endDate,
                           );
@@ -322,6 +462,9 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 🌍 Destinations
+                  const SizedBox(
+                    height: 10,
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -348,17 +491,23 @@ class _HomePageState extends State<HomePage> {
 
                   SizedBox(
                     height: 180,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      itemCount: destinations.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: destinationCard(destinations[index]),
-                        );
-                      },
-                    ),
+                    child: _isLoadingDestinations ||
+                            _visibleDestinations.isEmpty
+                        ? _buildDestinationPlaceholder()
+                        : ListView.builder(
+                            controller: _scrollController,
+                            scrollDirection: Axis.horizontal,
+                            cacheExtent: 520,
+                            itemCount: _visibleDestinations.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: destinationCard(
+                                  _visibleDestinations[index],
+                                ),
+                              );
+                            },
+                          ),
                   ),
                   const SizedBox(height: 20),
 
@@ -387,19 +536,54 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
 
-                  MasonryGridView.count(
-                    crossAxisCount:
-                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 32),
-                    itemCount: stays.length,
-                    itemBuilder: (context, index) {
-                      return stayCard(stays[index]);
-                    },
-                  ),
+                  if (_isLoadingStays)
+                    _buildPopularStaysPlaceholder()
+                  else
+                    MasonryGridView.count(
+                      crossAxisCount:
+                          MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      cacheExtent: 900,
+                      padding: const EdgeInsets.only(bottom: 18),
+                      itemCount: stays.length,
+                      itemBuilder: (context, index) {
+                        return stayCard(stays[index]);
+                      },
+                    ),
+                  if (!_isLoadingStays && stays.isNotEmpty)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BottomMenuTraveler(
+                                  index: 1, results: []),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.search, color: Colors.white),
+                        label: Text(
+                          lang.t("more_stays"),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF244B6B),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 32),
                 ],
               ),
             )),
@@ -409,15 +593,53 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  AccommodationFilter _buildCurrentFilter() {
+    final locationText = searchController.text.trim();
+
+    return AccommodationFilter(
+      lon: selectedLon,
+      lat: selectedLat,
+      city:
+          selectedLat == null && locationText.isNotEmpty ? locationText : null,
+      typeAcc: typeLogement,
+      wifi: wifi,
+      hasParking: parking,
+      disabledAccess: disabledAccess,
+      hasElevator: ascenseur,
+      entirePlace: entirePlace,
+      nbAdult: nbAdultes,
+      nbChild: nbEnfants,
+      nbBed: nbLits,
+      nbBedrooms: nbChambres,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
   void applyFiltersAndFetchResults() async {
-    if (selectedLat == null || selectedLon == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Veuillez d'abord sélectionner une adresse."),
-      ));
+    currentFilter = _buildCurrentFilter();
+
+    if (!currentFilter!.hasActiveFilters) {
+      try {
+        final response = await apiAcc.fetchFilteredStays({});
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(lang.t("popular_search_hint")),
+        ));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                BottomMenuTraveler(index: 1, results: response),
+          ),
+        );
+      } catch (e) {
+        print("Erreur lors du chargement des logements populaires: $e");
+      }
       return;
     }
     try {
-      final response = await apiAcc.fetchFilteredStays(currentFilter?.toJson());
+      final response = await apiAcc.fetchFilteredStays(currentFilter!.toJson());
 
       // 👇 Naviguer vers la page des résultats
       Navigator.push(
@@ -432,7 +654,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void openFilterModal() {
-    const Color primaryBlue = Color(0xFF244B6B);
+    final colors = Theme.of(context).colorScheme;
+    final primaryBlue = colors.primary;
     const Color accentOrange = Color(0xFFF37540);
     const Color yellow = Color(0xFFFBD107);
     const Color turquoise = Color(0xFF05A8CF);
@@ -441,7 +664,7 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -469,7 +692,7 @@ class _HomePageState extends State<HomePage> {
                       ),
 
                       /// 🗓️ Dates
-                      mthTr.sectionTitle("🗓️ Dates", primaryBlue),
+                      mthTr.sectionTitle("🗓️ ${lang.t("dates")}", primaryBlue),
                       const SizedBox(height: 8),
                       GestureDetector(
                         onTap: () async {
@@ -508,9 +731,9 @@ class _HomePageState extends State<HomePage> {
                               Text(
                                 (startDate != null && endDate != null)
                                     ? "${DateFormat.yMMMd().format(startDate!)} - ${DateFormat.yMMMd().format(endDate!)}"
-                                    : "Sélectionner les dates",
+                                    : lang.t("date_select"),
                                 style: TextStyle(
-                                  color: Colors.grey[800],
+                                  color: colors.onSurface,
                                   fontSize: 16,
                                 ),
                               ),
@@ -523,21 +746,29 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 24),
 
                       /// 👤 Capacité
-                      mthTr.sectionTitle("👤 Capacité", primaryBlue),
+                      mthTr.sectionTitle(
+                          "👤 ${lang.t("capacity")}", primaryBlue),
                       const SizedBox(height: 8),
-                      mthTr.coloredStepper("Chambres", nbChambres, yellow,
+                      mthTr.coloredStepper(lang.t("room"), nbChambres, yellow,
                           (val) => setStateModal(() => nbChambres = val)),
-                      mthTr.coloredStepper("Adultes", nbAdultes, turquoise,
+                      mthTr.coloredStepper(
+                          lang.t("adult"),
+                          nbAdultes,
+                          turquoise,
                           (val) => setStateModal(() => nbAdultes = val)),
-                      mthTr.coloredStepper("Enfants", nbEnfants, accentOrange,
+                      mthTr.coloredStepper(
+                          lang.t("child"),
+                          nbEnfants,
+                          accentOrange,
                           (val) => setStateModal(() => nbEnfants = val)),
-                      mthTr.coloredStepper("Lits", nbLits, vert,
+                      mthTr.coloredStepper(lang.t("bed"), nbLits, vert,
                           (val) => setStateModal(() => nbLits = val)),
 
                       const SizedBox(height: 24),
 
                       /// 🏡 Type de logement
-                      mthTr.sectionTitle("🏡 Type de logement", primaryBlue),
+                      mthTr.sectionTitle(
+                          "🏡 ${lang.t("type_accommodation")}", primaryBlue),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 10,
@@ -550,13 +781,13 @@ class _HomePageState extends State<HomePage> {
                           "loft",
                         ]
                             .map((type) => ChoiceChip(
-                                  label: Text(type),
+                                  label: Text(lang.t(type)),
                                   selected: typeLogement == type,
                                   selectedColor: turquoise,
                                   labelStyle: TextStyle(
                                       color: typeLogement == type
                                           ? Colors.white
-                                          : Colors.black),
+                                          : colors.onSurface),
                                   onSelected: (selected) => setStateModal(() =>
                                       typeLogement = selected ? type : ""),
                                 ))
@@ -566,23 +797,25 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 24),
 
                       /// ⚙️ Commodités
-                      mthTr.sectionTitle("⚙️ Commodités", primaryBlue),
-                      mthTr.buildCheckbox("Wi-Fi", wifi,
+                      mthTr.sectionTitle(
+                          "⚙️ ${lang.t("conveniance")}", primaryBlue),
+                      mthTr.buildCheckbox(lang.t("wifi"), wifi,
                           (val) => setStateModal(() => wifi = val)),
-                      mthTr.buildCheckbox("Ascenseur", ascenseur,
+                      mthTr.buildCheckbox(lang.t("elevator"), ascenseur,
                           (val) => setStateModal(() => ascenseur = val)),
-                      mthTr.buildCheckbox("Parking", parking,
+                      mthTr.buildCheckbox(lang.t("parking"), parking,
                           (val) => setStateModal(() => parking = val)),
 
                       const SizedBox(height: 24),
 
                       /// ♿ Accessibilité
-                      mthTr.sectionTitle("♿ Accessibilité", primaryBlue),
-                      mthTr.buildCheckbox(
-                          "Espace entier (Entire Place)",
-                          entirePlace,
+                      mthTr.sectionTitle(
+                          "♿ ${lang.t("accessibility")}", primaryBlue),
+                      mthTr.buildCheckbox(lang.t("entire_place"), entirePlace,
                           (val) => setStateModal(() => entirePlace = val)),
-                      mthTr.buildCheckbox("Accès handicapé", disabledAccess,
+                      mthTr.buildCheckbox(
+                          lang.t("desabled_access"),
+                          disabledAccess,
                           (val) => setStateModal(() => disabledAccess = val)),
 
                       const SizedBox(height: 32),
@@ -594,51 +827,38 @@ class _HomePageState extends State<HomePage> {
                             child: OutlinedButton(
                               onPressed: () {
                                 setStateModal(() {
-                                  nbChambres = 1;
-                                  nbAdultes = 1;
+                                  nbChambres = 0;
+                                  nbAdultes = 0;
                                   nbEnfants = 0;
                                   typeLogement = "";
                                   nbLits = 0;
                                   wifi =
-                                      ascenseur = entirePlace = parking = true;
+                                      ascenseur = entirePlace = parking = false;
                                   disabledAccess = false;
                                   startDate = endDate = null;
+                                  selectedLat = selectedLon = null;
+                                  searchController.clear();
                                 });
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: primaryBlue,
                                 side: BorderSide(color: primaryBlue),
                               ),
-                              child: const Text("Réinitialiser"),
+                              child: Text(lang.t("reset")),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                // TODO: appliquer les filtres
-                                currentFilter = AccommodationFilter(
-                                    lon: selectedLon ??
-                                        0, // par défaut 0 si pas encore sélectionné
-                                    lat: selectedLat ?? 0,
-                                    typeAcc: typeLogement,
-                                    wifi: wifi,
-                                    disabledAccess: disabledAccess,
-                                    hasElevator: ascenseur,
-                                    entirePlace: entirePlace,
-                                    nbAdult: nbAdultes,
-                                    nbChild: nbEnfants,
-                                    nbBed: nbLits,
-                                    startDate: startDate,
-                                    endDate: endDate);
                                 Navigator.pop(context);
                                 applyFiltersAndFetchResults();
                               },
                               style: ElevatedButton.styleFrom(
                                   backgroundColor: primaryBlue),
-                              child: const Text(
-                                "Appliquer",
-                                style: TextStyle(color: Colors.white),
+                              child: Text(
+                                lang.t("apply"),
+                                style: const TextStyle(color: Colors.white),
                               ),
                             ),
                           ),
@@ -656,7 +876,59 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildPopularStaysPlaceholder() {
+    final columns = MediaQuery.of(context).size.width > 600 ? 3 : 2;
+    final colors = Theme.of(context).colorScheme;
+
+    return MasonryGridView.count(
+      crossAxisCount: columns,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 18),
+      itemCount: columns * 2,
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: colors.surfaceContainerHighest,
+          highlightColor: colors.surfaceContainer,
+          child: Container(
+            height: index.isEven ? 220 : 190,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainer,
+              borderRadius: BorderRadius.circular(15),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // 📌 Widget pour une destination populaire (images agrandies)
+
+  Widget _buildDestinationPlaceholder() {
+    final colors = Theme.of(context).colorScheme;
+
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(width: 10),
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: colors.surfaceContainerHighest,
+          highlightColor: colors.surfaceContainer,
+          child: Container(
+            width: 160,
+            height: 180,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      },
+    );
+  }
   Widget destinationCard(Destination destination) {
     return GestureDetector(
       onTap: () async {
@@ -678,35 +950,21 @@ class _HomePageState extends State<HomePage> {
             children: [
               // 📌 Augmenter la taille des images
               (destination.imageUrl.isNotEmpty)
-                  ? Image.network(
-                      destination.imageUrl,
+                  ? OptimizedNetworkImage(
+                      imageUrl: destination.imageUrl,
                       width: 160,
                       height: 180,
                       fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return SizedBox(
-                          width: 160,
-                          height: 180,
-                          child: Shimmer.fromColors(
-                            baseColor: Colors.grey[300]!,
-                            highlightColor: Colors.white,
-                            child: Container(
-                              width: 160,
-                              height: 180,
-                              color: Colors.white,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Image.asset(
-                          'assets/images/default-destination.png',
-                          width: 160,
-                          height: 180,
-                          fit: BoxFit.cover,
-                        );
-                      },
+                      memCacheWidth: 360,
+                      memCacheHeight: 420,
+                      maxWidthDiskCache: 520,
+                      maxHeightDiskCache: 620,
+                      errorWidget: Image.asset(
+                        'assets/images/default-destination.png',
+                        width: 160,
+                        height: 180,
+                        fit: BoxFit.cover,
+                      ),
                     )
                   : Image.asset(
                       'assets/images/default-destination.png',
@@ -744,6 +1002,7 @@ class _HomePageState extends State<HomePage> {
   // 📌 Widget pour un hébergement populaire avec favori + devise dynamique
   Widget stayCard(Stay stay) {
     final exchangeRates = context.watch<ExchangeRateProvider>().rates;
+    final colors = Theme.of(context).colorScheme;
 
     final displayPrice = CurrencyConverter.format(stay.price.toDouble(),
         from: stay.currency, // Exemple: 'CFA' ou 'EUR'
@@ -770,7 +1029,8 @@ class _HomePageState extends State<HomePage> {
           children: [
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
+                color: colors.surfaceContainer,
+                border: Border.all(color: colors.outlineVariant),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Column(
@@ -791,31 +1051,15 @@ class _HomePageState extends State<HomePage> {
                             ),
                           );
                         },
-                        child: Image.network(
-                          stay.imageUrl, // Utilisation du lien dynamique
+                        child: OptimizedNetworkImage(
+                          imageUrl: stay.thumbnailUrl,
                           width: double.infinity,
                           height: 140,
                           fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return SizedBox(
-                              width: double.infinity,
-                              height: 140,
-                              child: Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.white,
-                                child: Container(
-                                  height: 140,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ); // Loader Shimmer ⏳
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.broken_image,
-                                size: 140,
-                                color: Colors.grey); // Icône en cas d'erreur
-                          },
+                          memCacheWidth: 520,
+                          memCacheHeight: 360,
+                          maxWidthDiskCache: 720,
+                          maxHeightDiskCache: 480,
                         ),
                       ),
                       Positioned(
@@ -887,8 +1131,11 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.all(5.0),
                     child: Text(
                       stay.title,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: colors.onSurface,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -897,8 +1144,11 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 5.0),
                     child: Text(
                       stay.location,
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.normal),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.normal,
+                        color: colors.onSurfaceVariant,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -908,8 +1158,8 @@ class _HomePageState extends State<HomePage> {
                     child: Text(
                       stay.price > 0
                           ? "$displayPrice / ${lang.t("night")}"
-                          : "📞 Contact us", // "$currency$stay.price",
-                      style: const TextStyle(fontSize: 14, color: Colors.blue),
+                          : "📞 ${lang.t("contact_us")}", // "$currency$stay.price",
+                      style: TextStyle(fontSize: 14, color: colors.primary),
                     ),
                   ),
                 ],

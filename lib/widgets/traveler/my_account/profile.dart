@@ -23,6 +23,7 @@ class _ProfilePageState extends State<ProfilePage> {
   late Future<UserProfile> _futureProfile;
   final ApiBooking api = ApiBooking();
   final ApiUserTraveler apiUser = ApiUserTraveler();
+  bool _profileUpdated = false;
 
   @override
   void initState() {
@@ -41,9 +42,14 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
-      body: SafeArea(
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _profileUpdated);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
         child: Stack(
           children: [
             Column(
@@ -391,8 +397,11 @@ class _ProfilePageState extends State<ProfilePage> {
                             builder: (_) => EditProfilePage(user: snap.data!),
                           ),
                         );
-                        if (updated == true) {
-                          setState(() => _futureProfile = _fetch());
+                        if (updated is UserProfile) {
+                          _profileUpdated = true;
+                          setState(
+                            () => _futureProfile = Future.value(updated),
+                          );
                         }
                       },
                       child: Padding(
@@ -422,6 +431,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -578,7 +588,7 @@ class _ProfilePageState extends State<ProfilePage> {
           IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded,
                 size: 20, color: Color(0xFF244B6B)),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, _profileUpdated),
           ),
           const SizedBox(width: 4),
           Text(
@@ -787,7 +797,7 @@ class _InfoSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE4EBF2)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF244B6B).withOpacity(0.06),
@@ -875,7 +885,7 @@ class _InfoRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FBFE),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE7EEF5)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -950,7 +960,7 @@ class _ActionRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE7EEF5)),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             child: Row(
               children: [
@@ -1013,3 +1023,4 @@ class _ActionRow extends StatelessWidget {
     );
   }
 }
+

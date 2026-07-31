@@ -3,6 +3,8 @@ import 'package:chicaparts_partner/widgets/booking/myBookings.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/favorites/favorites.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/bookingDetails.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/claims.dart';
+import 'package:chicaparts_partner/widgets/traveler/my_account/invoices.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/myBooking.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/my_reviews_page.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/profile.dart';
@@ -151,12 +153,27 @@ class MyApp extends StatelessWidget {
         '/finance': (_) => const BottomMenu(index: 2),
         '/operation': (_) => const BottomMenu(index: 3),
         '/home': (_) => const BottomMenuTraveler(index: 0, results: []),
+        '/my-account': (_) => const BottomMenuTraveler(index: 3, results: []),
         '/resume-reservation': (_) => const ResumeReservationPage(),
         '/account/settings': (_) => const SettingsPage(),
         '/account/profile': (_) => const ProfilePage(),
         '/reservations': (_) => const MyReservationsPage(),
         '/favorites': (_) => const BottomMenuTraveler(index: 2, results: []),
-        '/account/transactions': (_) => const TransactionPage()
+        '/account/transactions': (_) => const TransactionPage(),
+        '/account/payments': (_) => const TransactionPage(
+              paymentType: 'booking',
+              titleKey: 'payments',
+              fallbackTitleFr: 'Paiements',
+              fallbackTitleEn: 'Payments',
+            ),
+        '/account/invoices': (_) => const InvoicesPage(),
+        '/account/tips': (_) => const TransactionPage(
+              paymentType: 'tip',
+              titleKey: 'tips',
+              fallbackTitleFr: 'Pourboires',
+              fallbackTitleEn: 'Tips',
+            ),
+        '/account/claims': (_) => const ClaimsPage()
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';
@@ -312,9 +329,8 @@ ThemeData _buildLightTheme() {
     listTileTheme: const ListTileThemeData(iconColor: _kPrimary),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? _kPrimary
-            : Colors.white,
+        (states) =>
+            states.contains(WidgetState.selected) ? _kPrimary : Colors.white,
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)

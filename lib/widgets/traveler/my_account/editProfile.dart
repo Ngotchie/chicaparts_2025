@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
 import 'package:chicaparts_partner/models/traveler/modele_booking_traveler.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
@@ -85,17 +86,44 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       if (response.statusCode == 200) {
-        final user = User(currentUser.id, firstNameController.text,
-            currentUser.email, "traveler");
-        await prefs.setString('user', jsonEncode(user.toJson()));
-        Navigator.pop(context, true);
+        final updatedProfile =
+            await ApiBooking().fetchUserProfile(currentUser);
+        final previousThirdParty = currentUser.thirdParty is Map
+            ? Map<String, dynamic>.from(currentUser.thirdParty as Map)
+            : <String, dynamic>{};
+        final updatedThirdParty = <String, dynamic>{
+          ...previousThirdParty,
+          'first_name': updatedProfile.firstName,
+          'last_name': updatedProfile.lastName,
+          'gender': updatedProfile.gender,
+          'city': updatedProfile.city,
+          'mobile_phone_number': updatedProfile.phone,
+          'postcode': updatedProfile.zipCode,
+          'state': updatedProfile.state,
+          'country_id': updatedProfile.countryId,
+          'status': updatedProfile.status,
+          'entity_type': updatedProfile.entityType,
+        };
+        final fullName = [
+          updatedProfile.firstName.trim(),
+          updatedProfile.lastName.trim(),
+        ].where((part) => part.isNotEmpty).join(' ');
+        final updatedUser = User(
+          currentUser.id,
+          fullName.isEmpty ? currentUser.name : fullName,
+          updatedProfile.email,
+          updatedThirdParty,
+        );
+        await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+        if (!mounted) return;
+        Navigator.pop(context, updatedProfile);
       } else {
         _showError(context, "Unknow error");
       }
     } catch (e) {
       _showError(context, "Network error");
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -120,11 +148,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text("✏️ ${lang.t('edit_profile')}"),
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
         foregroundColor: const Color(0xFF244B6B),
       ),
 
@@ -326,7 +354,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: const Icon(Icons.transgender, color: Color(0xFF244B6B)),
         ),
         filled: true,
-        fillColor: const Color(0xFFF8FBFE),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.55),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: border,
@@ -359,7 +387,7 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE4EBF2)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF244B6B).withOpacity(0.06),
@@ -520,7 +548,7 @@ class _DisplayTile extends StatelessWidget {
       decoration: _modernInputDecoration(
         label: label,
         icon: icon,
-        fillColor: const Color(0xFFF1F5F9),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.55),
       ),
     );
   }
@@ -581,3 +609,4 @@ InputDecoration _modernInputDecoration({
         : null,
   );
 }
+

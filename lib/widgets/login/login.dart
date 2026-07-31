@@ -1,14 +1,17 @@
 import 'dart:convert';
 
 import 'package:chicaparts_partner/api/login/login.dart';
+import 'package:chicaparts_partner/api/login/social_auth.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/services/api.dart';
 import 'package:chicaparts_partner/services/favorite_repository.dart';
 import 'package:chicaparts_partner/widgets/login/forgot_password.dart';
+import 'package:chicaparts_partner/widgets/login/oauth_webview_page.dart';
 import 'package:chicaparts_partner/widgets/login/welcome.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenu.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenuTraveler.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:http/retry.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -160,6 +163,37 @@ class LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 15),
 
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _socialButton(
+                              label: 'Google',
+                              icon: FontAwesomeIcons.google,
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _authenticateWithSocial(
+                                        'google',
+                                        context,
+                                      ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _socialButton(
+                              label: 'Facebook',
+                              icon: FontAwesomeIcons.facebookF,
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _authenticateWithSocial(
+                                        'facebook',
+                                        context,
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+
                       // Forgot password
                       Center(
                         child: GestureDetector(
@@ -260,6 +294,28 @@ class LoginPageState extends State<LoginPage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _socialButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: FaIcon(icon, size: 18, color: Colors.white),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: Colors.white.withOpacity(0.72)),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
       ),
     );
@@ -500,6 +556,58 @@ class LoginPageState extends State<LoginPage> {
         (isEnglish ? "An error occurred: " : "Une erreur est survenue : ") +
             e.toString(),
       );
+    }
+  }
+
+  Future<void> _authenticateWithSocial(
+    String driver,
+    BuildContext context,
+  ) async {
+    setState(() => isLoading = true);
+
+    try {
+      final service = SocialAuthService();
+      final redirectUrl = await service.getRedirectUrl(driver);
+
+      if (!mounted) return;
+
+      final result = await Navigator.push<dynamic>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OAuthWebViewPage(
+            initialUrl: redirectUrl,
+            title: driver == 'google' ? 'Google' : 'Facebook',
+          ),
+        ),
+      );
+
+      if (!mounted || result == null) return;
+
+      if (result is OAuthWebViewError) {
+        _showErrorSnack(context, result.message);
+        return;
+      }
+
+      final auth = await service.completeWithToken(result.toString());
+      await FavoriteRepository.syncLocalFavoritesToServer(auth.user);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const BottomMenuTraveler(index: 0, results: []),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorSnack(
+        context,
+        isEnglish
+            ? 'Social login failed: $e'
+            : 'Connexion sociale impossible : $e',
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 

@@ -192,7 +192,12 @@ class OneBookingDetails {
     final createdAt = DateTime.parse(j['bookingTime']);
     final first = DateTime.parse(j['firstNight']);
     final last = DateTime.parse(j['lastNight']);
-    final nights = last.difference(first).inDays;
+    final firstDate = DateTime(first.year, first.month, first.day);
+    final lastDate = DateTime(last.year, last.month, last.day);
+    // `lastNight` est la dernière nuit occupée (le checkout est le lendemain).
+    // Les deux bornes sont donc incluses dans le nombre de nuitées.
+    final rawNights = lastDate.difference(firstDate).inDays + 1;
+    final nights = rawNights > 0 ? rawNights : 1;
 
     final hr = (acc['house_rules'] ?? {}) as Map<String, dynamic>;
 

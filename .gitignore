@@ -88,6 +88,7 @@ macos/*.xcodeproj/xcuserdata/
 # --- Web ---
 web/.dart_tool/
 web/build/
+web/env.js
 
 # --- Linux / Windows ---
 linux/flutter/ephemeral/
@@ -116,3 +117,6 @@ fastlane/screenshots
 
 # --- Autres caches ---
 .merged_manifests/
+
+# JVM heap dumps
+*.hprof

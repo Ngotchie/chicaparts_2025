@@ -2,6 +2,7 @@ import 'package:chicaparts_partner/api/traveler/api_accommodation_traveler.dart'
 import 'package:chicaparts_partner/methodTraveler.dart';
 import 'package:chicaparts_partner/models/traveler/model_accommodation_traveler.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
+import 'package:chicaparts_partner/widgets/traveler/search/accommodationMapView.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -26,11 +27,11 @@ class _SearchPageState extends State<SearchPage> {
   bool _isLoading = true;
 
   // Filtres
-  int nbAdultes = 1;
+  int nbAdultes = 0;
   int nbEnfants = 0;
-  int nbChambres = 1;
-  int nbLits = 1;
-  String typeLogement = "apartment";
+  int nbChambres = 0;
+  int nbLits = 0;
+  String typeLogement = "";
   DateTime? startDate;
   DateTime? endDate;
   bool wifi = false;
@@ -43,6 +44,7 @@ class _SearchPageState extends State<SearchPage> {
   double? selectedLon;
 
   bool _isSearch = true;
+  bool _showMap = false;
 
   @override
   void initState() {
@@ -90,8 +92,10 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final lang = context.read<LanguageProvider>();
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
@@ -116,18 +120,21 @@ class _SearchPageState extends State<SearchPage> {
                         lang.t("ideal_stay"),
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: const Icon(Icons.filter_alt_outlined,
-                        size: 28, color: Color(0xFF244B6B)),
+                    icon: Icon(
+                      Icons.filter_alt_outlined,
+                      size: 28,
+                      color: colors.primary,
+                    ),
                     onPressed: () {
                       openFilterModal(); // Ta fonction de filtre existante
                     },
-                    tooltip: "Filtres",
+                    tooltip: lang.t("filters"),
                   ),
                 ],
               ),
@@ -136,8 +143,11 @@ class _SearchPageState extends State<SearchPage> {
               TextField(
                 controller: searchController,
                 onChanged: (value) {
+                  selectedLat = null;
+                  selectedLon = null;
                   getSuggestion(value);
                 },
+                onSubmitted: (_) => applyFiltersAndFetchResults(),
                 decoration: InputDecoration(
                   hintText: lang.t("text_search_bar"),
                   suffixIcon: IconButton(
@@ -145,7 +155,7 @@ class _SearchPageState extends State<SearchPage> {
                     onPressed: openFilterModal,
                   ),
                   filled: true,
-                  fillColor: Colors.grey[200],
+                  fillColor: colors.surfaceContainerHighest.withOpacity(0.65),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -175,19 +185,23 @@ class _SearchPageState extends State<SearchPage> {
                             currentFilter = AccommodationFilter(
                               lon: lon,
                               lat: lat,
+                              city: place['text'] ?? place['place_name'],
                             );
                           } else {
                             currentFilter = AccommodationFilter(
                               lon: lon,
                               lat: lat,
+                              city: place['text'] ?? place['place_name'],
                               typeAcc: currentFilter!.typeAcc,
                               wifi: currentFilter!.wifi,
+                              hasParking: currentFilter!.hasParking,
                               disabledAccess: currentFilter!.disabledAccess,
                               hasElevator: currentFilter!.hasElevator,
                               entirePlace: currentFilter!.entirePlace,
                               nbAdult: currentFilter!.nbAdult,
                               nbChild: currentFilter!.nbChild,
                               nbBed: currentFilter!.nbBed,
+                              nbBedrooms: currentFilter!.nbBedrooms,
                               startDate: currentFilter!.startDate,
                               endDate: currentFilter!.endDate,
                             );
@@ -216,17 +230,53 @@ class _SearchPageState extends State<SearchPage> {
                       ),
                     )
                   : const Text(""),
+              if (!_isSearch && !_isLoading)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colors.primary.withOpacity(0.16),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.tune, color: colors.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          lang.t("search_refine_hint"),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colors.onSurfaceVariant,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (!_isLoading && stays.isNotEmpty) ...[
+                // const SizedBox(height: 10),
+                _buildViewSwitcher(lang),
+              ],
               // const SizedBox(height: 10),
               Expanded(
                 child: _isLoading
                     ? mthTr.buildShimmerLoader()
                     : stays.isNotEmpty
-                        ? ListView.builder(
-                            itemCount: stays.length,
-                            itemBuilder: (context, index) {
-                              return mthTr.stayCard(context, stays[index]);
-                            },
-                          )
+                        ? _showMap
+                            ? AccommodationMapView(stays: stays)
+                            : ListView.builder(
+                                itemCount: stays.length,
+                                itemBuilder: (context, index) {
+                                  return mthTr.stayCard(context, stays[index]);
+                                },
+                              )
                         : Center(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -237,16 +287,15 @@ class _SearchPageState extends State<SearchPage> {
                                   Icon(
                                     Icons.search_off_outlined,
                                     size: 60,
-                                    color: Colors.grey[400],
+                                    color: colors.onSurfaceVariant,
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
                                     lang.t("no_stay_found"),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(
-                                          0xFF244B6B), // ton bleu principal
+                                      color: colors.primary,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -255,7 +304,7 @@ class _SearchPageState extends State<SearchPage> {
                                     lang.t("filter_adjust"),
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.grey[600],
+                                      color: colors.onSurfaceVariant,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -271,8 +320,43 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  Widget _buildViewSwitcher(LanguageProvider lang) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withOpacity(0.65),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ViewSwitchButton(
+              icon: Icons.view_list_rounded,
+              label: lang.t('list'),
+              selected: !_showMap,
+              onTap: () => setState(() => _showMap = false),
+            ),
+          ),
+          Expanded(
+            child: _ViewSwitchButton(
+              icon: Icons.map_outlined,
+              label: lang.t('map'),
+              selected: _showMap,
+              onTap: () => setState(() => _showMap = true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void openFilterModal() {
-    const Color primaryBlue = Color(0xFF244B6B);
+    final colors = Theme.of(context).colorScheme;
+    final primaryBlue = colors.primary;
     const Color accentOrange = Color(0xFFF37540);
     const Color yellow = Color(0xFFFBD107);
     const Color turquoise = Color(0xFF05A8CF);
@@ -283,7 +367,7 @@ class _SearchPageState extends State<SearchPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -311,7 +395,7 @@ class _SearchPageState extends State<SearchPage> {
                       ),
 
                       /// 🗓️ Dates
-                      mthTr.sectionTitle("🗓️ Dates", primaryBlue),
+                      mthTr.sectionTitle("🗓️ ${lang.t("dates")}", primaryBlue),
                       const SizedBox(height: 8),
                       GestureDetector(
                         onTap: () async {
@@ -321,10 +405,10 @@ class _SearchPageState extends State<SearchPage> {
                             lastDate: DateTime(2100),
                             builder: (context, child) {
                               return Theme(
-                                data: Theme.of(context).copyWith(
-                                  colorScheme: ColorScheme.light(
-                                    primary: primaryBlue,
-                                  ),
+                               data: Theme.of(context).copyWith(
+                                  colorScheme: Theme.of(context)
+                                      .colorScheme
+                                      .copyWith(primary: primaryBlue),
                                 ),
                                 child: child!,
                               );
@@ -352,7 +436,7 @@ class _SearchPageState extends State<SearchPage> {
                                     ? "${DateFormat.yMMMd().format(startDate!)} - ${DateFormat.yMMMd().format(endDate!)}"
                                     : lang.t("date_select"),
                                 style: TextStyle(
-                                  color: Colors.grey[800],
+                                  color: colors.onSurface,
                                   fontSize: 16,
                                 ),
                               ),
@@ -368,7 +452,7 @@ class _SearchPageState extends State<SearchPage> {
                       mthTr.sectionTitle(
                           "👤 ${lang.t('capacity')}", primaryBlue),
                       const SizedBox(height: 8),
-                      mthTr.coloredStepper(lang.t("bed"), nbChambres, yellow,
+                      mthTr.coloredStepper(lang.t("room"), nbChambres, yellow,
                           (val) => setStateModal(() => nbChambres = val)),
                       mthTr.coloredStepper(
                           lang.t("adult"),
@@ -400,13 +484,13 @@ class _SearchPageState extends State<SearchPage> {
                           "loft",
                         ]
                             .map((type) => ChoiceChip(
-                                  label: Text(type),
+                                  label: Text(lang.t(type)),
                                   selected: typeLogement == type,
                                   selectedColor: turquoise,
                                   labelStyle: TextStyle(
                                       color: typeLogement == type
                                           ? Colors.white
-                                          : Colors.black),
+                                          : colors.onSurface),
                                   onSelected: (selected) => setStateModal(() =>
                                       typeLogement = selected ? type : ""),
                                 ))
@@ -418,11 +502,11 @@ class _SearchPageState extends State<SearchPage> {
                       /// ⚙️ Commodités
                       mthTr.sectionTitle(
                           "⚙️ ${lang.t("conveniance")}", primaryBlue),
-                      mthTr.buildCheckbox("Wi-Fi", wifi,
+                      mthTr.buildCheckbox(lang.t("wifi"), wifi,
                           (val) => setStateModal(() => wifi = val)),
                       mthTr.buildCheckbox(lang.t("elevator"), ascenseur,
                           (val) => setStateModal(() => ascenseur = val)),
-                      mthTr.buildCheckbox("Parking", parking,
+                      mthTr.buildCheckbox(lang.t("parking"), parking,
                           (val) => setStateModal(() => parking = val)),
 
                       const SizedBox(height: 24),
@@ -446,14 +530,16 @@ class _SearchPageState extends State<SearchPage> {
                             child: OutlinedButton(
                               onPressed: () {
                                 setStateModal(() {
-                                  nbChambres = 1;
-                                  nbAdultes = 1;
+                                  nbChambres = 0;
+                                  nbAdultes = 0;
                                   nbEnfants = 0;
                                   typeLogement = "";
                                   nbLits = 0;
                                   wifi = ascenseur = parking = false;
                                   entirePlace = disabledAccess = false;
                                   startDate = endDate = null;
+                                  selectedLat = selectedLon = null;
+                                  searchController.clear();
                                 });
                               },
                               style: OutlinedButton.styleFrom(
@@ -467,21 +553,6 @@ class _SearchPageState extends State<SearchPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                // TODO: appliquer les filtres
-                                currentFilter = AccommodationFilter(
-                                    lon: selectedLon ??
-                                        0, // par défaut 0 si pas encore sélectionné
-                                    lat: selectedLat ?? 0,
-                                    typeAcc: typeLogement,
-                                    wifi: wifi,
-                                    disabledAccess: disabledAccess,
-                                    hasElevator: ascenseur,
-                                    entirePlace: entirePlace,
-                                    nbAdult: nbAdultes,
-                                    nbChild: nbEnfants,
-                                    nbBed: nbLits,
-                                    startDate: startDate,
-                                    endDate: endDate);
                                 Navigator.pop(context);
                                 applyFiltersAndFetchResults();
                               },
@@ -507,21 +578,129 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  AccommodationFilter _buildCurrentFilter() {
+    final locationText = searchController.text.trim();
+
+    return AccommodationFilter(
+      lon: selectedLon,
+      lat: selectedLat,
+      city:
+          selectedLat == null && locationText.isNotEmpty ? locationText : null,
+      typeAcc: typeLogement,
+      wifi: wifi,
+      hasParking: parking,
+      disabledAccess: disabledAccess,
+      hasElevator: ascenseur,
+      entirePlace: entirePlace,
+      nbAdult: nbAdultes,
+      nbChild: nbEnfants,
+      nbBed: nbLits,
+      nbBedrooms: nbChambres,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
   void applyFiltersAndFetchResults() async {
-    if (selectedLat == null || selectedLon == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Veuillez d'abord sélectionner une adresse."),
-      ));
+    final lang = context.read<LanguageProvider>();
+    currentFilter = _buildCurrentFilter();
+
+    if (!currentFilter!.hasActiveFilters) {
+      setState(() {
+        _isLoading = true;
+        _isSearch = false;
+        suggestions = [];
+      });
+      try {
+        final response = await apiAcc.fetchFilteredStays({});
+        if (!mounted) return;
+        setState(() {
+          stays = response;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(lang.t("popular_search_hint")),
+        ));
+      } catch (e) {
+        setState(() => _isLoading = false);
+        print("Erreur lors du chargement des logements populaires: $e");
+      }
       return;
     }
+
+    setState(() {
+      _isLoading = true;
+      suggestions = [];
+    });
     try {
       final response = await apiAcc.fetchFilteredStays(currentFilter!.toJson());
       setState(() {
         _isSearch = true;
         stays = response;
+        _isLoading = false;
       });
     } catch (e) {
+      setState(() => _isLoading = false);
       print("Erreur lors de l'appel API: $e");
     }
+  }
+}
+
+class _ViewSwitchButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ViewSwitchButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? colors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: colors.shadow.withOpacity(0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? colors.primary : colors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

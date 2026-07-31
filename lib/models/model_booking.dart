@@ -23,6 +23,7 @@ class Booking {
   int propId;
   String img;
   String city;
+  bool hasTips;
 
   dynamic multiplier;
 
@@ -49,36 +50,71 @@ class Booking {
     this.propId,
     this.img,
     this.city,
+    this.hasTips,
     this.multiplier,
   );
 
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static num _asNum(dynamic value) {
+    if (value is num) return value;
+    return num.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static String _asString(dynamic value) => value?.toString() ?? '';
+
+  static String _asDateString(dynamic value) {
+    final text = _asString(value);
+    return DateTime.tryParse(text) == null ? '1970-01-01' : text;
+  }
+
+  static Text _asText(dynamic value) => Text(_asString(value));
+
+  static bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
   factory Booking.fromJson(Map<String, dynamic> json) {
-    // print(json);
+    final accommodation = json['accommodation'];
+    final accommodationMap =
+        accommodation is Map<String, dynamic> ? accommodation : null;
+    final photos = accommodationMap?['photos_site'];
+    final image = photos is List && photos.isNotEmpty ? photos.first : null;
+
     return Booking(
-      json['id'] ?? 0,
-      json['bookId'] ?? 0,
-      json['accommodation'] != null
-          ? json['accommodation']['external_name']
-          : '',
-      json['lastNight'] ?? '',
-      json['firstNight'] ?? '',
-      json['bookedAt'] ?? '',
-      json['guestFirstName'] ?? '',
-      json['guestName'] ?? '',
-      json['referer'] ?? '',
-      json['status'] ?? 0,
-      json['price'] ?? 0,
-      json['currency'] ?? '',
-      json['arrivalTime'] ?? '',
-      json['adult'] ?? 0,
-      json['child'] ?? 0,
-      json['arriveTime'] ?? '',
-      json['validation_status'] ?? '',
-      json['notes'] ?? Text(json["notes"] ?? ''),
-      json['roomId'] ?? 0,
-      json['propId'] ?? 0,
-      json['accommodation']['photos_site'][0],
-      json['accommodation']['city'],
+      _asInt(json['id']),
+      _asInt(json['bookId']),
+      _asString(accommodationMap?['external_name']),
+      _asDateString(json['lastNight']),
+      _asDateString(json['firstNight']),
+      _asDateString(json['bookedAt']),
+      _asString(json['guestFirstName']),
+      _asString(json['guestName']),
+      _asString(json['referer']),
+      _asInt(json['status']),
+      _asNum(json['price']),
+      _asString(json['currency']),
+      _asString(json['arrivalTime']),
+      _asInt(json['adult']),
+      _asInt(json['child']),
+      _asString(json['arriveTime']),
+      _asString(json['validation_status']),
+      _asText(json['notes']),
+      _asInt(json['roomId']),
+      _asInt(json['propId']),
+      _asString(image),
+      _asString(accommodationMap?['city']),
+      _asBool(json['has_tips']),
       json['multiplier'] ?? '', // ✅ can be null or dynamic
     );
   }
@@ -107,6 +143,7 @@ class Booking {
       'propId': propId,
       'img': img,
       'city': city,
+      'hasTips': hasTips,
       'multiplier': multiplier,
     };
   }

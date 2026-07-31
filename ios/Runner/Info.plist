@@ -45,6 +45,8 @@
   <true/>
   <key>UIApplicationSupportsIndirectInputEvents</key>
   <true/>
+  <key>GoogleMapsApiKey</key>
+  <string>$(GOOGLE_MAPS_API_KEY)</string>
 
   <!-- App Transport Security (ATS) -->
   <key>NSAppTransportSecurity</key>
