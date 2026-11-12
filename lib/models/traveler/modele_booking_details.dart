@@ -176,13 +176,13 @@ class OneBookingDetails {
       {String lang = 'fr'}) {
     final acc = (j['accommodation'] ?? {}) as Map<String, dynamic>;
 
-    String? _asNullableString(dynamic v) => v == null ? null : v.toString();
-    List<String> _asStringList(dynamic v) {
+    String? asNullableString(dynamic v) => v?.toString();
+    List<String> asStringList(dynamic v) {
       if (v is List) return v.map((e) => e.toString()).toList();
       return const <String>[];
     }
 
-    num _asNum(dynamic v) {
+    num asNum(dynamic v) {
       if (v == null) return 0;
       if (v is num) return v;
       if (v is String) return num.tryParse(v.trim()) ?? 0;
@@ -201,16 +201,16 @@ class OneBookingDetails {
 
     final hr = (acc['house_rules'] ?? {}) as Map<String, dynamic>;
 
-    final accessFr = _asNullableString(acc['access_instruction_fr']);
-    final accessEn = _asNullableString(acc['access_instruction_en']);
-    final checkoutFr = _asNullableString(acc['checkout_instructions_fr']);
-    final checkoutEn = _asNullableString(acc['checkout_instructions_en']);
+    final accessFr = asNullableString(acc['access_instruction_fr']);
+    final accessEn = asNullableString(acc['access_instruction_en']);
+    final checkoutFr = asNullableString(acc['checkout_instructions_fr']);
+    final checkoutEn = asNullableString(acc['checkout_instructions_en']);
     final accessTxt =
         lang == 'fr' ? (accessFr ?? accessEn) : (accessEn ?? accessFr);
     final checkoutTxt =
         lang == 'fr' ? (checkoutFr ?? checkoutEn) : (checkoutEn ?? checkoutFr);
 
-    final photos = _asStringList(acc['photos_site']);
+    final photos = asStringList(acc['photos_site']);
 
     final silent = hr['silent_hours'];
     final quiet =
@@ -224,15 +224,15 @@ class OneBookingDetails {
       nights: nights,
 
       currency: j['currency'] ?? 'FCFA',
-      price: _asNum(j['price']),
-      tax: _asNum(j['tax']),
-      serviceFee: _asNum(j['chicaparts_fees']),
-      cleaningFee: _asNum(j['cleaning_fees']),
-      total: _asNum(j['total_amount']), // <- était string dans ton exemple
-      paidAmount: _asNum(j['paid_amount']), // absent => 0
+      price: asNum(j['price']),
+      tax: asNum(j['tax']),
+      serviceFee: asNum(j['chicaparts_fees']),
+      cleaningFee: asNum(j['cleaning_fees']),
+      total: asNum(j['total_amount']), // <- était string dans ton exemple
+      paidAmount: asNum(j['paid_amount']), // absent => 0
       paymentStatus: j['payment_status'] ?? 'unpaid',
       validationStatus: j['validation_status'] ?? 'pending',
-      reference: _asNullableString(j['reference']),
+      reference: asNullableString(j['reference']),
       source: j['seller'] ?? j['referer'] ?? '—',
 
       numAdult: j['numAdult'] ?? 1,
@@ -243,24 +243,24 @@ class OneBookingDetails {
               .trim(),
       guestEmail: j['guestEmail'] ?? '',
       guestPhone: j['guestPhone'] ?? '',
-      guestAddress: _asNullableString(j['guestAddress']),
+      guestAddress: asNullableString(j['guestAddress']),
 
-      wifiSsid: _asNullableString(acc['wifi_identifiers']),
-      wifiPassword: _asNullableString(acc['wifi_password']),
-      floor: _asNullableString(acc['floor_number']),
-      door: _asNullableString(acc['door_number']),
-      parkingType: _asNullableString(acc['parking_type']),
+      wifiSsid: asNullableString(acc['wifi_identifiers']),
+      wifiPassword: asNullableString(acc['wifi_password']),
+      floor: asNullableString(acc['floor_number']),
+      door: asNullableString(acc['door_number']),
+      parkingType: asNullableString(acc['parking_type']),
       parkingLocation:
-          _asNullableString(acc['parking_address'] ?? acc['full_address']),
-      parkingAccess: _asNullableString(acc['parking_opening_method']),
-      parkingSlot: _asNullableString(acc['parking_slot']),
+          asNullableString(acc['parking_address'] ?? acc['full_address']),
+      parkingAccess: asNullableString(acc['parking_opening_method']),
+      parkingSlot: asNullableString(acc['parking_slot']),
 
       houseRules: OneBookingDetails._splitRules(
-          _asNullableString(acc['rule_of_procedure'])),
+          asNullableString(acc['rule_of_procedure'])),
       checkinTime:
-          OneBookingDetails._range(_asStringList(hr['arrival_time']).cast()),
+          OneBookingDetails._range(asStringList(hr['arrival_time']).cast()),
       checkoutTime:
-          OneBookingDetails._range(_asStringList(hr['departure_time']).cast()),
+          OneBookingDetails._range(asStringList(hr['departure_time']).cast()),
       quietHours: quiet,
       specificRules: OneBookingDetails._specificRules(hr),
 

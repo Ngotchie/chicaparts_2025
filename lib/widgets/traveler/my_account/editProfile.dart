@@ -86,8 +86,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       if (response.statusCode == 200) {
-        final updatedProfile =
-            await ApiBooking().fetchUserProfile(currentUser);
+        final updatedProfile = await ApiBooking().fetchUserProfile(currentUser);
         final previousThirdParty = currentUser.thirdParty is Map
             ? Map<String, dynamic>.from(currentUser.thirdParty as Map)
             : <String, dynamic>{};
@@ -342,7 +341,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     return DropdownButtonFormField<String>(
-      value: (selectedGender ?? '').isEmpty ? null : selectedGender,
+      initialValue: (selectedGender ?? '').isEmpty ? null : selectedGender,
       decoration: InputDecoration(
         labelText: lang.t('gender'),
         prefixIcon: Container(
@@ -354,7 +353,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: const Icon(Icons.transgender, color: Color(0xFF244B6B)),
         ),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.55),
+        fillColor: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.55),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: border,
@@ -548,7 +550,10 @@ class _DisplayTile extends StatelessWidget {
       decoration: _modernInputDecoration(
         label: label,
         icon: icon,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.55),
+        fillColor: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.55),
       ),
     );
   }
@@ -609,4 +614,3 @@ InputDecoration _modernInputDecoration({
         : null,
   );
 }
-

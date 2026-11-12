@@ -23,6 +23,7 @@ class ApiUrl {
 
   String getChicapartsUrl() {
     return "https://intranet.chic-aparts.com/chicaparts/";
+    //"http://127.0.0.1:8000/chicaparts/";
   }
 
   String getBookingUrl() {

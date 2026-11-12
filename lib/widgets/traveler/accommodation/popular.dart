@@ -1,12 +1,7 @@
 import 'package:chicaparts_partner/api/traveler/api_accommodation_traveler.dart';
 import 'package:chicaparts_partner/methodTraveler.dart';
 import 'package:chicaparts_partner/models/traveler/model_accommodation_traveler.dart';
-import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-import 'package:shimmer/shimmer.dart';
 
 class AllPopularStaysPage extends StatefulWidget {
   const AllPopularStaysPage({super.key});

@@ -4,6 +4,7 @@ import 'package:chicaparts_partner/models/model_booking.dart';
 import 'package:chicaparts_partner/models/traveler/modele_booking_details.dart';
 import 'package:chicaparts_partner/models/traveler/modele_booking_traveler.dart';
 import 'package:chicaparts_partner/models/traveler/modele_review.dart';
+import 'package:chicaparts_partner/models/traveler/price_quote.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/services/api.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/billingInfos.dart';
@@ -13,6 +14,52 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiBooking {
+  Future<PriceQuote> createPriceQuote({
+    required int accommodationId,
+    required DateTime checkIn,
+    required DateTime checkOut,
+    required int adults,
+    required int children,
+    String? promoCode,
+    String? replaceQuoteId,
+  }) async {
+    final api = ApiUrl();
+    final prefs = await SharedPreferences.getInstance();
+    final rawUser = prefs.getString('user');
+    final userId =
+        rawUser == null ? null : User.fromJson(jsonDecode(rawUser)).id;
+    final response = await http.post(
+      Uri.parse('${api.getChicapartsUrl()}v2/pricing/quote'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Authorization': api.getKey(),
+      },
+      body: jsonEncode({
+        'accommodation_id': accommodationId,
+        'first_night': checkIn.toIso8601String().split('T')[0],
+        'last_night': checkOut.toIso8601String().split('T')[0],
+        'num_adult': adults,
+        'num_child': children,
+        if (promoCode?.trim().isNotEmpty == true)
+          'promo_code': promoCode!.trim().toUpperCase(),
+        if (replaceQuoteId?.isNotEmpty == true)
+          'replace_quote_id': replaceQuoteId,
+        if (userId != null) 'user_id': userId,
+      }),
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        decoded is Map) {
+      return PriceQuote.fromJson(Map<String, dynamic>.from(decoded['data']));
+    }
+    final message = decoded is Map && decoded['error'] is Map
+        ? decoded['error']['message']?.toString()
+        : null;
+    throw Exception(message ?? 'Unable to calculate the booking price');
+  }
+
   Future<Map<DateTime, double>> fetchAvailabilities(accommodationId) async {
     ApiUrl url = ApiUrl();
     String apiUrl = url.getChicapartsUrl();
@@ -117,7 +164,7 @@ class ApiBooking {
     String apiUrl = url.getChicapartsUrl();
     String apiKey = url.getKey();
 
-    final uri = Uri.parse('${apiUrl}properties/booking');
+    final uri = Uri.parse('${apiUrl}v2/booking');
 
     final Map<String, dynamic> body = {
       ...booking.toJson(),
@@ -241,6 +288,7 @@ class ApiBooking {
   Future<void> requestCheckoutChange({
     required int bookingId,
     required User user,
+    required DateTime firstNight,
     required DateTime lastNight,
     String? reason,
   }) async {
@@ -256,6 +304,7 @@ class ApiBooking {
       },
       body: jsonEncode({
         'booking_id': bookingId,
+        'firstNight': firstNight.toIso8601String(),
         'lastNight': lastNight.toIso8601String(),
         'reason': reason,
       }),

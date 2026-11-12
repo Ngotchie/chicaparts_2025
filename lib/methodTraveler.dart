@@ -4,16 +4,13 @@ import 'package:chicaparts_partner/models/traveler/model_accommodation_traveler.
 import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/services/favorite_repository.dart';
 import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:provider/provider.dart';
-import 'package:chicaparts_partner/providers/language_provider.dart';
 
 const String mapboxApiKey =
     "pk.eyJ1IjoibmEyYXhsIiwiYSI6ImNqZ21rb2licjF0eWQycXBqNHF0ZDk3ejYifQ.ddbMwUsUIfCAtOR_fpmSIQ"; // Remplace par ta clé API

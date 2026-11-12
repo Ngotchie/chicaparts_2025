@@ -94,12 +94,22 @@ class _PaymentPageState extends State<PaymentPage> {
                     _buildDetailRow(
                       lang.t('base_price'),
                       CurrencyConverter.format(
-                        widget.bookingDetails.totalPrice,
+                        widget.bookingDetails.originalStayAmount,
                         from: widget.bookingDetails.currency,
                         to: selectedCurrency,
                         rates: exchangeRates,
                       ),
                     ),
+                    if (widget.bookingDetails.discountAmount > 0)
+                      _buildDetailRow(
+                        '${lang.t('promo_discount')}${widget.bookingDetails.promoCode == null ? '' : ' (${widget.bookingDetails.promoCode})'}',
+                        '-${CurrencyConverter.format(
+                          widget.bookingDetails.discountAmount,
+                          from: widget.bookingDetails.currency,
+                          to: selectedCurrency,
+                          rates: exchangeRates,
+                        )}',
+                      ),
                     _buildDetailRow(
                       lang.t('cleaning_fees'),
                       CurrencyConverter.format(
@@ -173,6 +183,16 @@ class _PaymentPageState extends State<PaymentPage> {
       );
 
       final bookingId = _extractBookingId(bookingResult);
+      final bookingAmount = _extractBookingValue(
+        bookingResult,
+        'total_amount',
+        widget.bookingDetails.finalPrice,
+      );
+      final bookingCurrency = _extractBookingString(
+        bookingResult,
+        'currency',
+        widget.bookingDetails.currency,
+      );
 
       if (!mounted) return;
 
@@ -196,8 +216,8 @@ class _PaymentPageState extends State<PaymentPage> {
           MaterialPageRoute(
             builder: (_) => PaymentProcessingPage(
               bookingId: bookingId,
-              amount: widget.bookingDetails.finalPrice,
-              currency: widget.bookingDetails.currency,
+              amount: bookingAmount,
+              currency: bookingCurrency,
               customerEmail: widget.billingInfo.email,
               customerPhoneNumber: widget.billingInfo.phone,
               checkInFormatted: _formatDate(widget.bookingDetails.checkIn),
@@ -249,8 +269,7 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       child: CheckboxListTile(
         value: _rulesAccepted,
-        onChanged: (value) =>
-            setState(() => _rulesAccepted = value ?? false),
+        onChanged: (value) => setState(() => _rulesAccepted = value ?? false),
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         title: Text(
@@ -298,7 +317,9 @@ class _PaymentPageState extends State<PaymentPage> {
       );
     }
 
-    return lines.isEmpty ? lang.t('house_rules_default_text') : lines.join('\n\n');
+    return lines.isEmpty
+        ? lang.t('house_rules_default_text')
+        : lines.join('\n\n');
   }
 
   Future<void> _showHouseRules(
@@ -546,6 +567,31 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     return null;
+  }
+
+  double _extractBookingValue(
+    dynamic bookingResult,
+    String key,
+    double fallback,
+  ) {
+    if (bookingResult is! Map) return fallback;
+    final data = bookingResult['data'];
+    final value = bookingResult[key] ?? (data is Map ? data[key] : null);
+    return value is num
+        ? value.toDouble()
+        : double.tryParse('$value') ?? fallback;
+  }
+
+  String _extractBookingString(
+    dynamic bookingResult,
+    String key,
+    String fallback,
+  ) {
+    if (bookingResult is! Map) return fallback;
+    final data = bookingResult['data'];
+    final value = bookingResult[key] ?? (data is Map ? data[key] : null);
+    final normalized = value?.toString().trim() ?? '';
+    return normalized.isEmpty ? fallback : normalized;
   }
 
   Widget _buildBottomBar(LanguageProvider lang, String total) {
@@ -840,9 +886,8 @@ class _PaymentChoiceTile extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: selected
-                    ? colors.primary
-                    : colors.surfaceContainerHighest,
+                color:
+                    selected ? colors.primary : colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -873,9 +918,7 @@ class _PaymentChoiceTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
               color: selected ? colors.primary : colors.outline,
             ),
           ],

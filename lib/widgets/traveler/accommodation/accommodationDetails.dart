@@ -905,7 +905,7 @@ class _AccommodationDetailsState extends State<AccommodationDetails> {
   Widget _buildDescription(String about, LanguageProvider lang) {
     final colors = Theme.of(context).colorScheme;
     final shouldShowToggle = _isLongDescription(about);
-    final previewHeight = _descriptionPreviewLines * _descriptionLineHeight;
+    const previewHeight = _descriptionPreviewLines * _descriptionLineHeight;
 
     return Container(
       width: double.infinity,

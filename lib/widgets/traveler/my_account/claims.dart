@@ -664,7 +664,7 @@ class _ClaimFormSheetState extends State<_ClaimFormSheet> {
                               ? _bookingId
                               : null;
                       return DropdownButtonFormField<int>(
-                        value: selectedBookingId,
+                        initialValue: selectedBookingId,
                         isExpanded: true,
                         decoration: _fieldDecoration(lang.t('booking')),
                         items: bookings.map((booking) {
@@ -695,7 +695,7 @@ class _ClaimFormSheetState extends State<_ClaimFormSheet> {
                   ),
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
-                    value: _type,
+                    initialValue: _type,
                     isExpanded: true,
                     decoration: _fieldDecoration(lang.t('claim_type')),
                     items: _types

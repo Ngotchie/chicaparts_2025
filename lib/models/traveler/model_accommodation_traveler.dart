@@ -156,7 +156,7 @@ class AccommodationFilter {
     return {
       if (lon != null && lat != null) "lon": lon,
       if (lon != null && lat != null) "lat": lat,
-      if (city != null && city!.trim().isNotEmpty) "city": city!.trim(),
+      if (city != null && city!.trim().isNotEmpty) "keyword": city!.trim(),
       if (typeAcc != null && typeAcc!.trim().isNotEmpty) "type_acc": typeAcc,
       if (wifi == true) "wifi_identifiers": true,
       if (hasParking == true) "has_parking": true,

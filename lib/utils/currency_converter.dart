@@ -40,9 +40,14 @@ class CurrencyConverter {
     to = _normalizeCurrency(to);
 
     final converted = convert(amount: amount, from: from, to: to, rates: rates);
+    // Le XAF n'utilise pas de décimales et les prix sont plus lisibles quand
+    // leur affichage est arrondi à la centaine la plus proche. Cet arrondi est
+    // strictement visuel : le montant métier conserve sa précision d'origine.
+    final displayAmount =
+        to == 'XAF' ? (converted / 100).round() * 100 : converted;
     final formatted = to != "XAF"
-        ? NumberFormat("#,##0.00", "fr_FR").format(converted)
-        : NumberFormat("#,##0", "fr_FR").format(converted.round());
+        ? NumberFormat("#,##0.00", "fr_FR").format(displayAmount)
+        : NumberFormat("#,##0", "fr_FR").format(displayAmount);
     return "$to $formatted";
   }
 

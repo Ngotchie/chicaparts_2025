@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:chicaparts_partner/api/traveler/api_accommodation_traveler.dart';
 import 'package:chicaparts_partner/methodTraveler.dart';
@@ -10,7 +9,6 @@ import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/favorite_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
-import 'package:chicaparts_partner/services/favorite_repository.dart';
 import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/menu/bottomMenuTraveler.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
@@ -18,13 +16,11 @@ import 'package:chicaparts_partner/widgets/traveler/accommodation/destinations.d
 import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/popular.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/setting.dart';
-import 'package:chicaparts_partner/widgets/traveler/search/searchPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 // final places = GoogleMapsPlaces(apiKey: kGoogleApiKey);
@@ -37,10 +33,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const int _homeDestinationLimit = 10;
+  static const int _homeStayLimit = 6;
+
   late ScrollController _scrollController;
   late Timer _timer;
+  Timer? _suggestionDebounce;
   List<Destination> destinations = [];
-  final Set<String> _readyDestinationImages = {};
   bool _isLoadingDestinations = true;
   List<Stay> stays = [];
   bool _isLoadingStays = true;
@@ -84,12 +83,24 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
-    loadDestinations();
-    loadStays();
     _scrollController = ScrollController();
+
+    final cachedDestinations = apiAcc.cachedDestinations;
+    if (cachedDestinations != null) {
+      destinations = cachedDestinations.take(_homeDestinationLimit).toList();
+      _isLoadingDestinations = false;
+    }
+    final cachedStays = apiAcc.cachedPopularStays;
+    if (cachedStays != null) {
+      stays = cachedStays.take(_homeStayLimit).toList();
+      _isLoadingStays = false;
+    }
+
+    _loadUserInfo();
+    loadDestinations(forceRefresh: cachedDestinations != null);
+    loadStays(forceRefresh: cachedStays != null);
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_visibleDestinations.length > 1 &&
+      if (destinations.length > 1 &&
           _scrollController.hasClients &&
           _scrollController.position.haveDimensions) {
         double nextOffset = _scrollController.offset + 200;
@@ -110,7 +121,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _timer.cancel();
+    _suggestionDebounce?.cancel();
     _scrollController.dispose();
+    searchController.dispose();
     super.dispose();
   }
 
@@ -121,6 +134,7 @@ class _HomePageState extends State<HomePage> {
     if (userJson != null && userJson.isNotEmpty) {
       final decoded = jsonDecode(userJson);
       user = User.fromJson(decoded);
+      if (!mounted) return;
       setState(() {
         userName = decoded['name'] ?? decoded['first_name'] ?? lang.t("guest");
         user = user;
@@ -132,16 +146,14 @@ class _HomePageState extends State<HomePage> {
   }
 
 // Charger les destinations
-  void loadDestinations() async {
+  Future<void> loadDestinations({bool forceRefresh = false}) async {
     try {
-      List<Destination> data = await apiAcc.fetchDestinations();
-      await _warmUpDestinationImages(data.take(6));
+      final data = await apiAcc.fetchDestinations(forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() {
-        destinations = data;
+        destinations = data.take(_homeDestinationLimit).toList();
         _isLoadingDestinations = false;
       });
-      _precacheDestinationImages(data.skip(6).toList());
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingDestinations = false);
@@ -150,25 +162,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  List<Destination> get _visibleDestinations {
-    return destinations
-        .where((destination) =>
-            destination.imageUrl.trim().isNotEmpty &&
-            _readyDestinationImages.contains(destination.imageUrl))
-        .toList();
-  }
-
   // Charger les hébergements populaires
-  void loadStays() async {
+  Future<void> loadStays({bool forceRefresh = false}) async {
     try {
-      List<Stay> data = await apiAcc.fetchStays();
-      await _warmUpPopularStayImages(data);
+      final data = await apiAcc.fetchStays(forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() {
-        stays = data;
+        stays = data.take(_homeStayLimit).toList();
         _isLoadingStays = false;
       });
-      _precachePopularStayImages(data.skip(6).toList());
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -179,118 +181,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _warmUpDestinationImages(Iterable<Destination> data) async {
-    final futures = data.map((destination) async {
-      final imageUrl = destination.imageUrl;
-      if (imageUrl.trim().isEmpty) return;
-
-      try {
-        await precacheImage(
-          OptimizedNetworkImage.provider(
-            imageUrl,
-            maxWidth: 360,
-            maxHeight: 420,
-          ),
-          context,
-        );
-        if (mounted) {
-          setState(() => _readyDestinationImages.add(imageUrl));
-        } else {
-          _readyDestinationImages.add(imageUrl);
-        }
-      } catch (_) {}
-    }).toList();
-
-    if (futures.isEmpty) return;
-
-    try {
-      await Future.wait(futures).timeout(const Duration(milliseconds: 1200));
-    } on TimeoutException {
-      // Keep the skeleton until each image finishes and updates the ready set.
-    }
-  }
-
-  void _precacheDestinationImages(List<Destination> data) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      for (final destination in data.take(6)) {
-        final imageUrl = destination.imageUrl;
-        if (imageUrl.trim().isEmpty) continue;
-
-        precacheImage(
-          OptimizedNetworkImage.provider(
-            imageUrl,
-            maxWidth: 360,
-            maxHeight: 420,
-          ),
-          context,
-        ).then((_) {
-          if (!mounted) return;
-          setState(() => _readyDestinationImages.add(imageUrl));
-        }).catchError((_) {});
-      }
-    });
-  }
-
-  Future<void> _warmUpPopularStayImages(List<Stay> data) async {
-    final futures = data.take(6).map((stay) {
-      final imageUrl = stay.thumbnailUrl.trim().isNotEmpty
-          ? stay.thumbnailUrl
-          : stay.imageUrl;
-      if (imageUrl.trim().isEmpty) return Future<void>.value();
-
-      return precacheImage(
-        OptimizedNetworkImage.provider(
-          imageUrl,
-          maxWidth: 520,
-          maxHeight: 360,
-        ),
-        context,
-      ).catchError((_) {});
-    }).toList();
-
-    if (futures.isEmpty) return;
-
-    try {
-      await Future.wait(futures).timeout(const Duration(milliseconds: 900));
-    } on TimeoutException {
-      // Do not block the home page if a thumbnail is slow.
-    }
-  }
-
-  void _precachePopularStayImages(List<Stay> data) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      for (final stay in data.take(8)) {
-        final imageUrl = stay.thumbnailUrl.trim().isNotEmpty
-            ? stay.thumbnailUrl
-            : stay.imageUrl;
-        if (imageUrl.trim().isEmpty) continue;
-
-        precacheImage(
-          OptimizedNetworkImage.provider(
-            imageUrl,
-            maxWidth: 520,
-            maxHeight: 360,
-          ),
-          context,
-        );
-      }
-    });
-  }
-
-  void getSuggestion(query) async {
+  void getSuggestion(String query) {
+    _suggestionDebounce?.cancel();
     if (query.length < 3) {
       setState(() {
         suggestions = [];
       });
       return;
     }
-    List<dynamic> results = await mthTr.fetchSuggestions(query);
-    setState(() {
-      suggestions = results;
+    _suggestionDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final results = await mthTr.fetchSuggestions(query);
+      if (!mounted || searchController.text != query) return;
+      setState(() {
+        suggestions = results;
+      });
     });
   }
 
@@ -491,23 +395,23 @@ class _HomePageState extends State<HomePage> {
 
                   SizedBox(
                     height: 180,
-                    child: _isLoadingDestinations ||
-                            _visibleDestinations.isEmpty
-                        ? _buildDestinationPlaceholder()
-                        : ListView.builder(
-                            controller: _scrollController,
-                            scrollDirection: Axis.horizontal,
-                            cacheExtent: 520,
-                            itemCount: _visibleDestinations.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: destinationCard(
-                                  _visibleDestinations[index],
-                                ),
-                              );
-                            },
-                          ),
+                    child:
+                        _isLoadingDestinations || destinations.isEmpty
+                            ? _buildDestinationPlaceholder()
+                            : ListView.builder(
+                                controller: _scrollController,
+                                scrollDirection: Axis.horizontal,
+                                cacheExtent: 520,
+                                itemCount: destinations.length,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 10),
+                                    child: destinationCard(
+                                      destinations[index],
+                                    ),
+                                  );
+                                },
+                              ),
                   ),
                   const SizedBox(height: 20),
 
@@ -929,6 +833,7 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
+
   Widget destinationCard(Destination destination) {
     return GestureDetector(
       onTap: () async {

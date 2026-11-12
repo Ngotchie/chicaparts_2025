@@ -1,5 +1,6 @@
 import 'package:chicaparts_partner/models/traveler/model_accommodation_traveler.dart';
 import 'package:chicaparts_partner/widgets/traveler/chatbot/chatbot_sheet.dart';
+import 'package:chicaparts_partner/widgets/traveler/chat/chat_discussions_page.dart';
 import 'package:chicaparts_partner/widgets/traveler/favorites/favorites.dart';
 import 'package:chicaparts_partner/widgets/traveler/home.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/myAccount.dart';
@@ -64,6 +65,7 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
     final pages = <Widget>[
       const HomePage(),
       SearchPage(results: search_result),
+      const ChatDiscussionsPage(),
       const FavoritesPages(),
       const MyAccountPage(),
     ];
@@ -82,6 +84,9 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
           selectedItemColor:
               const Color(0xFFFFC107), // Icône sélectionnée en blanc
           unselectedItemColor: colors.onPrimary,
+          selectedFontSize: 11,
+          unselectedFontSize: 10,
+          iconSize: 22,
           // Icône non sélectionnée en jaune
           showUnselectedLabels:
               true, // Afficher les labels des icônes non sélectionnées
@@ -95,6 +100,10 @@ class _BottomMenuTravelerState extends State<BottomMenuTraveler> {
             BottomNavigationBarItem(
               icon: const Icon(Icons.search),
               label: lang.t('search'),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.forum_outlined),
+              label: lang.currentLang == 'fr' ? 'Messages' : 'Messages',
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.favorite),

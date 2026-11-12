@@ -5,6 +5,7 @@ import 'package:chicaparts_partner/models/traveler/modele_review.dart';
 import 'package:chicaparts_partner/models/user/user.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
 import 'package:chicaparts_partner/widgets/traveler/book/payment_processing_page.dart';
+import 'package:chicaparts_partner/widgets/traveler/chat/booking_chat_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -213,8 +214,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     final lang = Provider.of<LanguageProvider>(context, listen: false);
     if (_currentUser == null) return;
 
-    final currentCheckout = d.lastNight.add(const Duration(days: 1));
-    DateTime selectedDate = currentCheckout.add(const Duration(days: 1));
+    final currentStart = d.firstNight;
+    final currentEnd = d.lastNight;
+    DateTimeRange selectedRange = DateTimeRange(
+      start: currentStart,
+      end: currentEnd,
+    );
     final reasonController = TextEditingController();
     // Une prolongation est estimée sur le tarif d'hébergement moyen.
     // Les taxes et frais ponctuels du séjour existant ne doivent pas être
@@ -226,19 +231,26 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final extraNights = selectedDate.difference(currentCheckout).inDays;
-            final supplement = dailyTotal * extraNights;
+            final selectedNights = selectedRange.duration.inDays;
+            final nightsDifference = selectedNights - d.nights;
+            final estimatedAdjustment = dailyTotal * nightsDifference;
 
-            Future<void> pickDate() async {
-              final picked = await showDatePicker(
+            Future<void> pickDates() async {
+              final today = DateTime.now();
+              final todayDate = DateTime(today.year, today.month, today.day);
+              final firstSelectableDate =
+                  currentStart.isBefore(todayDate) ? currentStart : todayDate;
+              final picked = await showDateRangePicker(
                 context: context,
-                firstDate: currentCheckout.add(const Duration(days: 1)),
-                lastDate: DateTime.now().add(const Duration(days: 730)),
-                initialDate: selectedDate,
+                firstDate: firstSelectableDate,
+                lastDate: todayDate.add(const Duration(days: 730)),
+                initialDateRange: selectedRange,
+                helpText: lang.t('select_new_dates'),
+                saveText: lang.t('validate'),
               );
 
               if (picked != null) {
-                setModalState(() => selectedDate = picked);
+                setModalState(() => selectedRange = picked);
               }
             }
 
@@ -253,7 +265,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
               actionsPadding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
               title: _RequestDialogTitle(
                 icon: Icons.event_repeat_outlined,
-                title: lang.t('extend_booking'),
+                title: lang.t('change_booking_dates'),
                 color: const Color(0xFF244B6B),
               ),
               content: SingleChildScrollView(
@@ -271,17 +283,26 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                             color:
                                 Theme.of(context).colorScheme.outlineVariant),
                       ),
-                      child: _DialogInfoLine(
-                        label: lang.t('current_checkout'),
-                        value: DateFormat('dd MMM yyyy').format(
-                          currentCheckout,
-                        ),
-                        bold: true,
+                      child: Column(
+                        children: [
+                          _DialogInfoLine(
+                            label: lang.t('current_checkin'),
+                            value:
+                                DateFormat('dd MMM yyyy').format(currentStart),
+                            bold: true,
+                          ),
+                          const SizedBox(height: 8),
+                          _DialogInfoLine(
+                            label: lang.t('current_checkout'),
+                            value: DateFormat('dd MMM yyyy').format(currentEnd),
+                            bold: true,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      lang.t('extend_booking_intro'),
+                      lang.t('change_booking_dates_intro'),
                       style: const TextStyle(
                         color: Color(0xFF667085),
                         height: 1.35,
@@ -289,12 +310,12 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      lang.t('new_checkout_date'),
+                      lang.t('new_stay_dates'),
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     InkWell(
-                      onTap: pickDate,
+                      onTap: pickDates,
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         width: double.infinity,
@@ -318,7 +339,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                DateFormat('dd MMM yyyy').format(selectedDate),
+                                '${DateFormat('dd MMM yyyy').format(selectedRange.start)} – ${DateFormat('dd MMM yyyy').format(selectedRange.end)}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -342,13 +363,14 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _DialogInfoLine(
-                            label: lang.t('additional_nights'),
-                            value: '$extraNights',
+                            label: lang.t('new_stay_duration'),
+                            value: '$selectedNights ${lang.t('nights')}',
                           ),
                           const SizedBox(height: 8),
                           _DialogInfoLine(
-                            label: lang.t('estimated_supplement'),
-                            value: _formatMoney(supplement, d.currency),
+                            label: lang.t('estimated_price_adjustment'),
+                            value:
+                                _formatMoney(estimatedAdjustment, d.currency),
                             bold: true,
                           ),
                         ],
@@ -399,12 +421,11 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                         onPressed: () {
                           final reason = reasonController.text.trim();
 
-                          if (!selectedDate.isAfter(currentCheckout)) {
+                          if (!selectedRange.start
+                              .isBefore(selectedRange.end)) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(
-                                  lang.t('checkout_date_must_be_after'),
-                                ),
+                                content: Text(lang.t('invalid_dates_range')),
                               ),
                             );
                             return;
@@ -449,7 +470,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
       await api.requestCheckoutChange(
         bookingId: int.tryParse(d.id) ?? 0,
         user: _currentUser!,
-        lastNight: selectedDate,
+        firstNight: selectedRange.start,
+        lastNight: selectedRange.end,
         reason: reasonController.text.trim().isEmpty
             ? null
             : reasonController.text.trim(),
@@ -619,11 +641,6 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   Widget _reviewSection(OneBookingDetails d) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
 
@@ -701,7 +718,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                   onPressed: _deleteMyReview,
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   label: Text(lang.t('delete'),
-                      style: TextStyle(color: Colors.red)),
+                      style: const TextStyle(color: Colors.red)),
                 ),
               ],
             )
@@ -759,8 +776,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
         }
 
         final d = snapshot.data!;
-        final bool isConfirmed = d.validationStatus == 'confirmed';
         final status = d.validationStatus.toLowerCase();
+        final bool isConfirmed = status == 'confirmed' || status == 'accepted';
         final bool canPay = d.paymentStatus != 'paid' && status != 'cancelled';
         final today = DateTime.now();
         final todayDate = DateTime(today.year, today.month, today.day);
@@ -771,9 +788,8 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
           d.lastNight.month,
           d.lastNight.day,
         ).add(const Duration(days: 1));
-        final bool isCurrentBooking = status == 'confirmed' &&
-            !todayDate.isBefore(checkInDate) &&
-            todayDate.isBefore(checkoutDate);
+        final bool canChangeDates =
+            isConfirmed && todayDate.isBefore(checkoutDate);
         final bool canRequestCancellation =
             status != 'cancelled' && todayDate.isBefore(checkInDate);
 
@@ -795,10 +811,10 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
             d: d,
             lang: lang,
             canPay: canPay,
-            canExtend: isCurrentBooking,
+            canExtend: canChangeDates,
             canRequestCancellation: canRequestCancellation,
             onPay: canPay ? () => _openPayment(d) : null,
-            onExtend: isCurrentBooking ? () => _requestBookingChange(d) : null,
+            onExtend: canChangeDates ? () => _requestBookingChange(d) : null,
             onCancelRefund: canRequestCancellation
                 ? () => _requestCancellationRefund(d)
                 : null,
@@ -850,6 +866,29 @@ class _BookingDetailsPageState extends State<BookingDetailsPage>
                               color: Color(0xFF244B6B),
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: lang.currentLang == 'fr'
+                                ? 'Contacter le service réservation'
+                                : 'Contact booking support',
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => BookingChatPage(
+                                    bookingId: int.parse(widget.bookingId),
+                                    bookingReference: d.reference,
+                                    accommodationName: d.accommodationTitle,
+                                    firstNight: d.firstNight,
+                                    lastNight: d.lastNight,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.forum_outlined,
+                              color: Color(0xFF244B6B),
                             ),
                           ),
                         ],
@@ -1237,13 +1276,13 @@ class _UsefulInfoTab extends StatelessWidget {
         final sections = <Widget>[
           _InfoSection(
             title: lang.t('wifi_access'),
-            children: const [],
             rows: [
               InfoRow(lang.t('wifi_identifier'), d.wifiSsid ?? "—",
                   boldValue: true),
               InfoRow(lang.t('password'), d.wifiPassword ?? "—",
                   boldValue: true),
             ],
+            children: const [],
           ),
           _InfoSection(
             title: lang.t('accessibility'),
@@ -1280,7 +1319,7 @@ class _UsefulInfoTab extends StatelessWidget {
           children: [
             CardSection(
               title: lang.t('useful_info'),
-              child: _ResponsiveColumns(children: sections, columns: cols),
+              child: _ResponsiveColumns(columns: cols, children: sections),
             ),
             const SizedBox(height: 12),
             CardSection(
@@ -1382,12 +1421,10 @@ class _AccommodationTab extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
                   onPressed: () {
-                    if (d.accommodationId != null) {
-                      Navigator.pushNamed(
-                        context,
-                        '/acc/${d.accommodationId}/${d.currency}/${d.price}',
-                      );
-                    }
+                    Navigator.pushNamed(
+                      context,
+                      '/acc/${d.accommodationId}/${d.currency}/${d.price}',
+                    );
                   },
                   icon: const Icon(Icons.home_outlined),
                   label: Text(lang.t('view_all_details')),
@@ -1417,7 +1454,7 @@ class _ResponsiveColumns extends StatelessWidget {
             .toList(),
       );
     }
-    final spacing = 16.0;
+    const spacing = 16.0;
     final totalSpacing = spacing * (columns - 1);
     final width = (MediaQuery.of(context).size.width - totalSpacing - 32) /
         columns; // -32 padding card
@@ -1457,7 +1494,7 @@ class InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final bool boldValue;
-  const InfoRow(this.label, this.value, {this.boldValue = false});
+  const InfoRow(this.label, this.value, {super.key, this.boldValue = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1494,7 +1531,7 @@ class InfoRow extends StatelessWidget {
 /// Titre de sous-section (inchangé si tu as déjà cette classe)
 class InfoHeader extends StatelessWidget {
   final String text;
-  const InfoHeader(this.text);
+  const InfoHeader(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {

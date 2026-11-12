@@ -10,6 +10,7 @@ import 'package:chicaparts_partner/providers/language_provider.dart';
 import 'package:chicaparts_partner/utils/currency_converter.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/optimized_network_image.dart';
 import 'package:chicaparts_partner/widgets/traveler/common/login_required_state.dart';
+import 'package:chicaparts_partner/widgets/traveler/chat/booking_chat_page.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/account_class.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/claims.dart';
 import 'package:flutter/material.dart';
@@ -92,7 +93,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
     if (!computedIsGuest) {
       try {
         // Construire ton modèle User depuis userMap (pas de double jsonDecode)
-        final user = User.fromJson(userMap!);
+        final user = User.fromJson(userMap);
 
         // Peut throw / renvoyer des champs null → on entoure de try
         final UserProfile userProfile = await apiBooking.fetchUserProfile(user);
@@ -110,12 +111,10 @@ class _MyAccountPageState extends State<MyAccountPage> {
         // On log mais on ne casse pas l’écran
         debugPrint('fetchUserProfile error: $e');
         // computedName/computedEmail si possible depuis userMap
-        if (userMap != null) {
-          computedName ??=
-              (userMap['name'] ?? userMap['first_name'] ?? 'Utilisateur')
-                  .toString();
-          computedEmail ??= (userMap['email'] ?? '').toString();
-        }
+        computedName ??=
+            (userMap['name'] ?? userMap['first_name'] ?? 'Utilisateur')
+                .toString();
+        computedEmail ??= (userMap['email'] ?? '').toString();
       }
     }
 
@@ -127,7 +126,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
     try {
       computedShowBanner = (!computedIsGuest) &&
           (!remindLater) &&
-          (userMap != null && _isProfileIncomplete(userMap!));
+          (_isProfileIncomplete(userMap));
     } catch (e) {
       debugPrint('_isProfileIncomplete error: $e');
       computedShowBanner = false;
@@ -242,10 +241,18 @@ class _MyAccountPageState extends State<MyAccountPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.calendar_month_outlined),
-                title: Text(lang.t('update')),
-                onTap: () =>
-                    Navigator.pop(sheetContext, _BookingAction.changeDates),
+                leading: const Icon(Icons.forum_outlined),
+                title: Text(
+                  lang.currentLang == 'fr'
+                      ? 'Écrire au service réservation'
+                      : 'Message booking support',
+                ),
+                subtitle: Text(
+                  lang.currentLang == 'fr'
+                      ? 'Concernant ce séjour'
+                      : 'About this stay',
+                ),
+                onTap: () => Navigator.pop(sheetContext, _BookingAction.chat),
               ),
               ListTile(
                 leading: const Icon(Icons.chat_outlined),
@@ -258,18 +265,19 @@ class _MyAccountPageState extends State<MyAccountPage> {
                     Navigator.pop(sheetContext, _BookingAction.whatsApp),
               ),
               ListTile(
-                leading: const Icon(Icons.forum_outlined),
+                leading: const Icon(Icons.calendar_month_outlined),
                 title: Text(
                   lang.currentLang == 'fr'
-                      ? 'Chat dans l’application'
-                      : 'In-app chat',
+                      ? 'Modifier la réservation'
+                      : 'Update booking',
                 ),
                 subtitle: Text(
                   lang.currentLang == 'fr'
-                      ? 'Bientôt disponible'
-                      : 'Coming soon',
+                      ? 'Dates et détails du séjour'
+                      : 'Dates and stay details',
                 ),
-                onTap: () => Navigator.pop(sheetContext, _BookingAction.chat),
+                onTap: () =>
+                    Navigator.pop(sheetContext, _BookingAction.changeDates),
               ),
               if (isConfirmed) ...[
                 ListTile(
@@ -317,12 +325,15 @@ class _MyAccountPageState extends State<MyAccountPage> {
         await _openBookingWhatsApp(booking, lang);
         break;
       case _BookingAction.chat:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              lang.currentLang == 'fr'
-                  ? 'Le chat dans l’application sera bientôt disponible.'
-                  : 'In-app chat will be available soon.',
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BookingChatPage(
+              bookingId: booking.id,
+              bookingReference:
+                  booking.bookId > 0 ? booking.bookId.toString() : null,
+              accommodationName: booking.accommodation,
+              firstNight: DateTime.tryParse(booking.firstNight),
+              lastNight: DateTime.tryParse(booking.lastNight),
             ),
           ),
         );

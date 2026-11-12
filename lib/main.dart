@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'package:chicaparts_partner/widgets/booking/myBookings.dart';
 import 'package:chicaparts_partner/widgets/traveler/accommodation/accommodationDetails.dart';
-import 'package:chicaparts_partner/widgets/traveler/favorites/favorites.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/bookingDetails.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/claims.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/invoices.dart';
@@ -10,6 +8,7 @@ import 'package:chicaparts_partner/widgets/traveler/my_account/my_reviews_page.d
 import 'package:chicaparts_partner/widgets/traveler/my_account/profile.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/setting.dart';
 import 'package:chicaparts_partner/widgets/traveler/my_account/transaction.dart';
+import 'package:chicaparts_partner/widgets/traveler/chat/booking_chat_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -153,7 +152,8 @@ class MyApp extends StatelessWidget {
         '/finance': (_) => const BottomMenu(index: 2),
         '/operation': (_) => const BottomMenu(index: 3),
         '/home': (_) => const BottomMenuTraveler(index: 0, results: []),
-        '/my-account': (_) => const BottomMenuTraveler(index: 3, results: []),
+        '/my-account': (_) => const BottomMenuTraveler(index: 4, results: []),
+        '/chats': (_) => const BottomMenuTraveler(index: 3, results: []),
         '/resume-reservation': (_) => const ResumeReservationPage(),
         '/account/settings': (_) => const SettingsPage(),
         '/account/profile': (_) => const ProfilePage(),
@@ -187,6 +187,19 @@ class MyApp extends StatelessWidget {
             builder: (_) => BookingDetailsPage(bookingId: id),
             settings: settings,
           );
+        }
+
+        // /reservations/<id>/chat
+        if (uri.pathSegments.length == 3 &&
+            uri.pathSegments[0] == 'reservations' &&
+            uri.pathSegments[2] == 'chat') {
+          final id = int.tryParse(uri.pathSegments[1]);
+          if (id != null) {
+            return MaterialPageRoute(
+              builder: (_) => BookingChatPage(bookingId: id),
+              settings: settings,
+            );
+          }
         }
 
         // /acc/<id>/<currency>/<price>

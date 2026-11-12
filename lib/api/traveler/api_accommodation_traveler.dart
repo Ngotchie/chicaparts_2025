@@ -5,7 +5,26 @@ import 'package:chicaparts_partner/services/api.dart';
 import 'package:http/http.dart' as http;
 
 class ApiAccommodationTraveler {
-  Future<List<Destination>> fetchDestinations() async {
+  static const Duration _homeCacheTtl = Duration(minutes: 5);
+  static List<Destination>? _destinationsCache;
+  static DateTime? _destinationsCachedAt;
+  static List<Stay>? _popularStaysCache;
+  static DateTime? _popularStaysCachedAt;
+
+  List<Destination>? get cachedDestinations => _destinationsCache;
+  List<Stay>? get cachedPopularStays => _popularStaysCache;
+
+  bool _isFresh(DateTime? cachedAt) =>
+      cachedAt != null && DateTime.now().difference(cachedAt) < _homeCacheTtl;
+
+  Future<List<Destination>> fetchDestinations({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _destinationsCache != null &&
+        _isFresh(_destinationsCachedAt)) {
+      return _destinationsCache!;
+    }
     ApiUrl url = ApiUrl();
     String apiUrl = url.getChicapartsUrl();
     String apiKey = url.getKey();
@@ -17,13 +36,22 @@ class ApiAccommodationTraveler {
 
     if (response.statusCode == 200) {
       List jsonResponse = jsonDecode(response.body);
-      return jsonResponse.map((data) => Destination.fromJson(data)).toList();
+      final destinations =
+          jsonResponse.map((data) => Destination.fromJson(data)).toList();
+      _destinationsCache = destinations;
+      _destinationsCachedAt = DateTime.now();
+      return destinations;
     } else {
       throw Exception("Failed to load destinations");
     }
   }
 
-  Future<List<Stay>> fetchStays() async {
+  Future<List<Stay>> fetchStays({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _popularStaysCache != null &&
+        _isFresh(_popularStaysCachedAt)) {
+      return _popularStaysCache!;
+    }
     ApiUrl url = ApiUrl();
     String apiUrl = url.getChicapartsUrl();
     String apiKey = url.getKey();
@@ -37,6 +65,8 @@ class ApiAccommodationTraveler {
       final jsonResponse = jsonDecode(response.body);
       List<dynamic> staysData = jsonResponse['data'];
       List<Stay> stays = staysData.map((data) => Stay.fromJson(data)).toList();
+      _popularStaysCache = stays;
+      _popularStaysCachedAt = DateTime.now();
       return stays;
     } else {
       throw Exception("Failed to load stays");

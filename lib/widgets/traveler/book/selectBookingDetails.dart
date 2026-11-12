@@ -1,5 +1,6 @@
 import 'package:chicaparts_partner/api/traveler/api_accommodation_traveler.dart';
 import 'package:chicaparts_partner/api/traveler/api_booking_traveler.dart';
+import 'package:chicaparts_partner/models/traveler/price_quote.dart';
 import 'package:chicaparts_partner/providers/currency_provider.dart';
 import 'package:chicaparts_partner/providers/exchange_rate_provider.dart';
 import 'package:chicaparts_partner/providers/language_provider.dart';
@@ -42,7 +43,11 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
   DateTime? _checkOutDate;
   int _adults = 1;
   int _children = 0;
-  double _totalPrice = 0.0;
+  PriceQuote? _priceQuote;
+  bool _isPricing = false;
+  int _pricingRequest = 0;
+  final TextEditingController _promoController = TextEditingController();
+  String? _appliedPromoCode;
   DateTime _focusedDay = DateTime.now();
   final apiBooking = ApiBooking();
   final apiAccommodation = ApiAccommodationTraveler();
@@ -55,7 +60,7 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
   int get _totalTravelers => _adults + _children;
   int get _remainingCapacity => widget.capacity - _totalTravelers;
   bool get _hasValidStay =>
-      _checkInDate != null && _checkOutDate != null && _totalPrice > 0;
+      _checkInDate != null && _checkOutDate != null && _priceQuote != null;
 
   String displayPrice = '';
 
@@ -63,6 +68,12 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
   void initState() {
     super.initState();
     _getAvailibilities();
+  }
+
+  @override
+  void dispose() {
+    _promoController.dispose();
+    super.dispose();
   }
 
   @override
@@ -336,6 +347,92 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
     );
   }
 
+  void _applyPromoCode() {
+    final code = _promoController.text.trim();
+    if (code.isEmpty) return;
+    if (_checkInDate == null || _checkOutDate == null) {
+      return;
+    }
+    _updateTotalPrice(promoCode: code, applyingPromo: true);
+  }
+
+  void _removePromoCode() {
+    _promoController.clear();
+    setState(() {
+      _appliedPromoCode = null;
+    });
+    _updateTotalPrice(promoCode: '');
+  }
+
+  Future<void> _showPromoDialog(LanguageProvider lang) async {
+    final canApply = _checkInDate != null && _checkOutDate != null;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.local_offer_outlined),
+            const SizedBox(width: 10),
+            Text(lang.t('promo_code')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _promoController,
+              enabled: _appliedPromoCode == null && !_isPricing,
+              autofocus: canApply,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: lang.t('promo_code_hint'),
+                prefixIcon: const Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+            if (!canApply) ...[
+              const SizedBox(height: 10),
+              Text(
+                lang.t('promo_select_dates_first'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (_appliedPromoCode != null)
+            TextButton(
+              onPressed: _isPricing
+                  ? null
+                  : () {
+                      Navigator.pop(dialogContext);
+                      _removePromoCode();
+                    },
+              child: Text(lang.t('promo_remove')),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          if (_appliedPromoCode == null)
+            FilledButton(
+              onPressed: !canApply || _isPricing
+                  ? null
+                  : () {
+                      Navigator.pop(dialogContext);
+                      _applyPromoCode();
+                    },
+              child: Text(lang.t('promo_apply')),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTravelerSelector(
     String label,
     int value,
@@ -432,7 +529,21 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
   Widget _buildBottomBar(LanguageProvider lang) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final totalText = _totalPrice > 0 ? displayPrice : '--';
+    final totalText = _isPricing
+        ? '...'
+        : _priceQuote != null
+            ? displayPrice
+            : '--';
+    final hasDiscount =
+        _priceQuote != null && _priceQuote!.discountAmount > 0;
+    final originalTotalText = hasDiscount
+        ? CurrencyConverter.format(
+            _priceQuote!.totalAmount + _priceQuote!.discountAmount,
+            from: _priceQuote!.currency,
+            to: context.read<CurrencyProvider>().currency,
+            rates: context.read<ExchangeRateProvider>().rates,
+          )
+        : null;
 
     return SafeArea(
       top: false,
@@ -458,6 +569,20 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  if (originalTotalText != null)
+                    Text(
+                      originalTotalText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: colors.onSurfaceVariant,
+                        decorationThickness: 1.5,
+                      ),
+                    ),
                   Text(
                     totalText,
                     maxLines: 1,
@@ -466,6 +591,37 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
                       color: colors.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  InkWell(
+                    onTap: _isPricing ? null : () => _showPromoDialog(lang),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_offer_outlined,
+                            size: 15,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              _appliedPromoCode ?? lang.t('promo_code'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -483,7 +639,7 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () => _continueToBilling(lang),
+                onPressed: _isPricing ? null : () => _continueToBilling(lang),
                 icon: const Icon(Icons.arrow_forward, size: 18),
                 label: Text(
                   lang.t('continue'),
@@ -518,10 +674,16 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
       checkOut: _checkOutDate!,
       adults: _adults,
       children: _children,
-      totalPrice: _totalPrice,
-      currency: widget.currency,
-      cleaningFees: widget.cleaningFees,
-      cityTaxe: _totalPrice * 0.12,
+      quoteId: _priceQuote!.quoteId,
+      totalPrice: _priceQuote!.stayAmount,
+      originalStayAmount:
+          _priceQuote!.nightAmount + _priceQuote!.extraGuestAmount,
+      currency: _priceQuote!.currency,
+      cleaningFees: _priceQuote!.cleaningTotal,
+      cityTaxe: _priceQuote!.taxAmount,
+      chicapartsFees: _priceQuote!.serviceFee,
+      discountAmount: _priceQuote!.discountAmount,
+      promoCode: _priceQuote!.promotionCode,
       propId: widget.propId,
       roomId: widget.roomId,
       houseRulesText: _houseRulesText,
@@ -552,17 +714,15 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
         } else {
           _checkInDate = selected;
           _checkOutDate = null;
-          _totalPrice = 0;
           displayPrice = '';
         }
       } else {
         _checkInDate = selected;
         _checkOutDate = null;
-        _totalPrice = 0;
         displayPrice = '';
       }
-      _updateTotalPrice();
     });
+    _updateTotalPrice();
   }
 
   bool _isAvailable(DateTime date) {
@@ -582,49 +742,62 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
     return true;
   }
 
-  void _updateTotalPrice() {
+  Future<void> _updateTotalPrice(
+      {String? promoCode, bool applyingPromo = false}) async {
     if (_checkInDate != null && _checkOutDate != null) {
-      double basePrice = 0.0;
-      DateTime currentDate = _dateOnly(_checkInDate!);
-      while (currentDate.isBefore(_checkOutDate!)) {
-        final price = availablePrices[_dateOnly(currentDate)];
-        basePrice += _effectiveNightPrice(price);
-        currentDate = currentDate.add(const Duration(days: 1));
-      }
-
-      final extraTravelers =
-          (_adults + _children) > 2 ? (_adults + _children - 2) : 0;
-      final extraCostPerTraveler = CurrencyConverter.convert(
-        amount: 10,
-        from: 'EUR',
-        to: widget.currency,
-        rates: context.read<ExchangeRateProvider>().rates,
-      );
-      final extraCost = extraTravelers * extraCostPerTraveler;
-      final rates = context.read<ExchangeRateProvider>().rates;
-
+      final requestId = ++_pricingRequest;
+      final previousQuoteId = _priceQuote?.quoteId;
+      final requestedPromoCode = promoCode ?? _appliedPromoCode;
       setState(() {
-        _totalPrice = basePrice + extraCost;
-        displayPrice = CurrencyConverter.format(
-          _totalPrice,
-          from: widget.currency,
-          to: context.read<CurrencyProvider>().currency,
-          rates: rates,
-        );
+        _isPricing = true;
+        _priceQuote = null;
       });
+      try {
+        final quote = await apiBooking.createPriceQuote(
+          accommodationId: widget.idAcc,
+          checkIn: _checkInDate!,
+          checkOut: _checkOutDate!,
+          adults: _adults,
+          children: _children,
+          promoCode: requestedPromoCode,
+          replaceQuoteId: previousQuoteId,
+        );
+        if (!mounted || requestId != _pricingRequest) return;
+        final rates = context.read<ExchangeRateProvider>().rates;
+        setState(() {
+          _priceQuote = quote;
+          _appliedPromoCode = quote.promotionCode;
+          displayPrice = CurrencyConverter.format(
+            quote.totalAmount,
+            from: quote.currency,
+            to: context.read<CurrencyProvider>().currency,
+            rates: rates,
+          );
+          _isPricing = false;
+        });
+      } catch (error) {
+        if (!mounted || requestId != _pricingRequest) return;
+        setState(() {
+          _priceQuote = null;
+          displayPrice = '';
+          _isPricing = false;
+          if (applyingPromo) {
+            _appliedPromoCode = null;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
     } else {
+      _pricingRequest++;
       setState(() {
-        _totalPrice = 0;
+        _priceQuote = null;
+        _isPricing = false;
         displayPrice = '';
       });
     }
-  }
-
-  double _effectiveNightPrice(double? availabilityPrice) {
-    if (availabilityPrice != null && availabilityPrice > 0) {
-      return availabilityPrice;
-    }
-    return widget.pricePerNight > 0 ? widget.pricePerNight : 0.0;
   }
 
   String _plainText(String html) {
@@ -640,56 +813,49 @@ class _SelectBookingDetailsPageState extends State<SelectBookingDetailsPage> {
 }
 
 class BookingDetails {
+  final String quoteId;
   final DateTime checkIn;
   final DateTime checkOut;
   final int adults;
   final int children;
   final double totalPrice;
+  final double originalStayAmount;
   final String currency;
   final double cleaningFees;
   final double cityTaxe;
   final double chicapartsFees;
+  final double discountAmount;
+  final String? promoCode;
   final int propId;
   final int roomId;
   final String houseRulesText;
   final Map<String, dynamic> houseRules;
 
   BookingDetails({
+    required this.quoteId,
     required this.checkIn,
     required this.checkOut,
     required this.adults,
     required this.children,
     required this.totalPrice,
+    required this.originalStayAmount,
     required this.currency,
     required this.cleaningFees,
     required this.cityTaxe,
+    required this.chicapartsFees,
+    required this.discountAmount,
+    this.promoCode,
     required this.propId,
     required this.roomId,
     required this.houseRulesText,
     required this.houseRules,
-  }) : chicapartsFees = totalPrice * 0.10;
+  });
 
   double get finalPrice =>
       totalPrice + cleaningFees + cityTaxe + chicapartsFees;
 
   Map<String, dynamic> toJson() => {
-        'propId': propId,
-        'roomId': roomId,
-        'firstNight': checkIn.toIso8601String().split('T')[0],
-        'lastNight': checkOut.toIso8601String().split('T')[0],
-        'numAdult': adults,
-        'numChild': children,
-        'price': totalPrice.toStringAsFixed(2),
-        'currency': _normalizedCurrency,
-        'tax': cityTaxe.toStringAsFixed(2),
-        'commission': chicapartsFees.toStringAsFixed(2),
-        'cleaning_fees_partner': cleaningFees.toStringAsFixed(2),
+        'quote_id': quoteId,
         'house_rules_accepted': true,
       };
-
-  String get _normalizedCurrency {
-    final value = currency.trim().toUpperCase();
-    if (value == 'FCFA' || value == 'CFA' || value == 'XOF') return 'XAF';
-    return value;
-  }
 }

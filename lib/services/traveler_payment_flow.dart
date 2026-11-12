@@ -244,15 +244,23 @@ class TravelerPaymentFlow {
     }
 
     if (order.paymentUrl?.isNotEmpty != true || order.orderId.isEmpty) {
+      if (_hasExistingTransactionCode(order.raw)) {
+        return TravelerPaymentResult(
+          status: TravelerPaymentStatus.pending,
+          order: order,
+          message: lang.t('payment_already_exists_message'),
+        );
+      }
       return TravelerPaymentResult(
         status: TravelerPaymentStatus.failed,
         order: order,
-        message: _backendOrderMessage(order.raw) ??
-            lang.t(
-              order.orderId.isEmpty
-                  ? 'payment_order_missing'
-                  : 'payment_link_missing',
-            ),
+        // Never expose a provider response here. It may contain transaction
+        // identifiers, tokens or other implementation details.
+        message: lang.t(
+          order.orderId.isEmpty
+              ? 'payment_order_missing'
+              : 'payment_link_missing',
+        ),
       );
     }
 
@@ -415,17 +423,40 @@ class TravelerPaymentFlow {
     }
   }
 
-  String? _backendOrderMessage(Map<String, dynamic> response) {
-    final error = response['error'];
-    final values = [
-      response['message'],
-      if (error is Map) error['message'],
-      if (error is Map && error['details'] is Map) error['details']['message'],
-    ];
-    for (final value in values) {
-      if (value is String && value.trim().isNotEmpty) return value.trim();
+  bool _hasExistingTransactionCode(Map<String, dynamic> response) {
+    const codeKeys = {'code', 'status', 'error_code', 'errorCode'};
+
+    bool isExistingCode(dynamic value) {
+      final normalized = value
+          ?.toString()
+          .trim()
+          .toUpperCase()
+          .replaceAll(RegExp(r'[^A-Z0-9]+'), '_');
+      return normalized == 'TRANSACTION_ALREADY_EXIST' ||
+          normalized == 'TRANSACTION_ALREADY_EXISTS' ||
+          normalized == '2010';
     }
-    return null;
+
+    bool visit(dynamic value) {
+      if (value is Map) {
+        for (final entry in value.entries) {
+          if (codeKeys.contains(entry.key.toString()) &&
+              isExistingCode(entry.value)) {
+            return true;
+          }
+        }
+        for (final nested in value.values) {
+          if (visit(nested)) return true;
+        }
+      } else if (value is Iterable) {
+        for (final nested in value) {
+          if (visit(nested)) return true;
+        }
+      }
+      return false;
+    }
+
+    return visit(response);
   }
 
   Future<bool> _confirmResumeAttempt(

@@ -701,7 +701,7 @@ class SectionDivider extends StatelessWidget {
 class CardSection extends StatelessWidget {
   final String title;
   final Widget child;
-  const CardSection({required this.title, required this.child});
+  const CardSection({super.key, required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -727,7 +727,7 @@ class CardSection extends StatelessWidget {
 
 class InfoHeader extends StatelessWidget {
   final String text;
-  const InfoHeader(this.text);
+  const InfoHeader(this.text, {super.key});
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
@@ -743,7 +743,7 @@ class InfoRowGlobal extends StatelessWidget {
   final bool boldValue;
   final Color? badgeColor;
   const InfoRowGlobal(this.label, this.value,
-      {this.boldValue = false, this.badgeColor});
+      {super.key, this.boldValue = false, this.badgeColor});
 
   @override
   Widget build(BuildContext context) {
@@ -782,7 +782,8 @@ class MoneyRow extends StatelessWidget {
   final num amount;
   final String currency;
   final bool bold;
-  const MoneyRow(this.label, this.amount, this.currency, {this.bold = false});
+  const MoneyRow(this.label, this.amount, this.currency,
+      {super.key, this.bold = false});
 
   @override
   Widget build(BuildContext context) {
@@ -804,7 +805,7 @@ class MoneyRow extends StatelessWidget {
 
 class InfoColumn extends StatelessWidget {
   final List<Widget> items;
-  const InfoColumn({required this.items});
+  const InfoColumn({super.key, required this.items});
   @override
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: items);
@@ -827,7 +828,7 @@ class ReviewFormData {
 
 class ReviewForm extends StatefulWidget {
   final void Function(ReviewFormData data) onSubmit;
-  const ReviewForm({required this.onSubmit});
+  const ReviewForm({super.key, required this.onSubmit});
   @override
   State<ReviewForm> createState() => _ReviewFormState();
 }
@@ -867,7 +868,7 @@ class _ReviewFormState extends State<ReviewForm> {
         // Curseur avec indicateur de valeur
         SliderTheme(
           data: const SliderThemeData(
-              showValueIndicator: ShowValueIndicator.always),
+              showValueIndicator: ShowValueIndicator.onDrag),
           child: Slider(
             value: value.toDouble(),
             min: 1,
@@ -973,7 +974,7 @@ class _ReviewFormState extends State<ReviewForm> {
 
 class ReviewDialog extends StatefulWidget {
   final ReviewFormData initial;
-  const ReviewDialog({required this.initial});
+  const ReviewDialog({super.key, required this.initial});
   @override
   State<ReviewDialog> createState() => ReviewDialogState();
 }
@@ -1066,7 +1067,7 @@ class ReviewDialogState extends State<ReviewDialog> {
 class RatingLine extends StatelessWidget {
   final String label;
   final int value;
-  const RatingLine({required this.label, required this.value});
+  const RatingLine({super.key, required this.label, required this.value});
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1469,7 +1470,7 @@ class _PillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = const Color(0xFF244B6B);
+    const primary = Color(0xFF244B6B);
 
     if (filled) {
       return InkWell(
@@ -1540,6 +1541,7 @@ class SyncReservationsWidget extends StatefulWidget {
   final User user;
 
   const SyncReservationsWidget({
+    super.key,
     required this.api,
     required this.user,
   });
@@ -1677,7 +1679,7 @@ class SyncReservationsWidgetState extends State<SyncReservationsWidget> {
           const SizedBox(height: 8),
           Text(
             lang.t('sync_from'),
-            style: TextStyle(fontSize: 14, color: Colors.grey),
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
           ),
 
           const SizedBox(height: 20),
@@ -1801,7 +1803,7 @@ class SyncReservationsWidgetState extends State<SyncReservationsWidget> {
 
 class TipWidget extends StatefulWidget {
   final Booking booking;
-  const TipWidget({required this.booking});
+  const TipWidget({super.key, required this.booking});
 
   @override
   State<TipWidget> createState() => _TipWidgetState();
